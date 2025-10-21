@@ -1,0 +1,20 @@
+RMSE: !!python/object/apply:numpy._core.multiarray.scalar
+- !!python/object/apply:numpy.dtype
+  args:
+  - f8
+  - false
+  - true
+  state: !!python/tuple
+  - 3
+  - <
+  - null
+  - null
+  - null
+  - -1
+  - -1
+  - 0
+- !!binary |
+  zrK5gB7fxz8=
+MAE: 0.13441902328465388
+R2: 0.9860115970304751
+MAPE: 0.004581832134478069
