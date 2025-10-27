@@ -20,9 +20,9 @@ def load_and_clean_raw(file_path):
     df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.sort_values("datetime").reset_index(drop=True)
 
-    # Fill missing values
-    num_cols = df.select_dtypes(include=[np.number]).columns
-    df[num_cols] = df[num_cols].fillna(df[num_cols].mean())
+    # # Fill missing values
+    # num_cols = df.select_dtypes(include=[np.number]).columns
+    # df[num_cols] = df[num_cols].fillna(df[num_cols].mean())
     
     # Drop unnecessary columns
     drop_cols = ["stations", "description", "icon", "name"]

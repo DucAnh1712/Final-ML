@@ -6,7 +6,7 @@ import joblib
 import yaml
 import optuna
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_squared_error
 from xgboost import XGBRegressor
@@ -23,10 +23,7 @@ def load_features_for_tuning(target_col):
     val = pd.read_csv(os.path.join(config.FEATURE_DIR, "feature_val.csv"))
 
     # Concat train and val for Optuna's TimeSeriesSplit
-    # (Since feature_train dropped NaNs, but feature_val did not)
     full_train_df = pd.concat([train, val], ignore_index=True)
-    # full_train_df["datetime"] = pd.to_datetime(full_train_df["datetime"])
-    # full_train_df = full_train_df.sort_values("datetime").reset_index(drop=True)
     
     # Drop non-feature columns
     drop_cols = [target_col, 'datetime']
@@ -64,9 +61,8 @@ def xgb_objective(trial, X, y):
         y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
 
         # This pipeline only includes Scaler and Model
-        # Because X has already been feature-engineered
         pipe = Pipeline([
-            ("scaler", StandardScaler()),
+            ("scaler", RobustScaler()),
             ("xgb", XGBRegressor(**params))
         ])
 
@@ -102,11 +98,10 @@ def main():
     task.get_logger().report_scalar("best_rmse", "RMSE", value=study.best_value, iteration=0)
 
     # 4. CREATE FINAL PRODUCTION PIPELINE
-    # This pipeline will include ALL steps
     print("🛠️ Creating final production pipeline...")
     production_pipeline = Pipeline([
         ('feature_engineering', create_feature_pipeline()),
-        ('scaler', StandardScaler()),
+        ('scaler', RobustScaler()),
         ('model', XGBRegressor(**best_params, random_state=42, n_jobs=-1))
     ])
 
@@ -115,7 +110,6 @@ def main():
     train_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
     val_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv"))
     
-    # Concat data (this time, "processed" data, BEFORE features)
     all_train_data = pd.concat([train_df, val_df], ignore_index=True)
     all_train_data["datetime"] = pd.to_datetime(all_train_data["datetime"])
     all_train_data = all_train_data.sort_values("datetime").reset_index(drop=True)
@@ -131,6 +125,35 @@ def main():
     joblib.dump(production_pipeline, model_path)
     print(f"✅ Production pipeline saved to: {model_path}")
     
+    # ======================================================
+    # 7. SAVE TO ONNX FORMAT (STEP 9) - ĐÃ SỬA LẠI
+    # ======================================================
+    print("🛠️ Creating ONNX-convertible components (Scaler + Model)...")
+
+    # 1. Tạo và huấn luyện Scaler
+    scaler = RobustScaler() 
+    X_train_full_feat, y_train_full_feat = load_features_for_tuning(config.TARGET_COL)
+    scaler.fit(X_train_full_feat)
+    
+    # 2. Áp dụng Scaler
+    X_train_scaled = scaler.transform(X_train_full_feat)
+
+    # 3. Tạo và huấn luyện Model
+    model_xgb = XGBRegressor(**best_params, random_state=42, n_jobs=-1)
+    model_xgb.fit(X_train_scaled, y_train_full_feat)
+
+    # 4. LƯU 2 FILE RIÊNG BIỆT
+    # 4a. Lưu Scaler bằng joblib
+    scaler_path = os.path.join(config.MODEL_DIR, "scaler_for_onnx.pkl")
+    joblib.dump(scaler, scaler_path)
+    print(f"✅ ONNX Scaler saved to: {scaler_path}")
+    
+    # 4b. Lưu XGBoost bằng .save_model (JSON) để tránh lỗi pickle
+    model_json_path = os.path.join(config.MODEL_DIR, "model_for_onnx.json")
+    model_xgb.save_model(model_json_path)
+    print(f"✅ ONNX XGBoost Model saved to: {model_json_path}")
+    # ======================================================
+
     # Save best_params.yaml
     params_path = os.path.join(config.MODEL_DIR, "best_params.yaml")
     with open(params_path, "w") as f:

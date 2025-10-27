@@ -9,7 +9,28 @@ import config
 # ======================================================
 # 1. CUSTOM TRANSFORMER CLASSES (Step 4)
 # ======================================================
+class FFillImputer(BaseEstimator, TransformerMixin):
+    """
+    Apply .fillna(method='ffill') and .fillna(method='bfill')
+    ONLY to numeric columns.
+    This respects time-series order and is safe from data leakage.
+    """
+    def __init__(self):
+        self.num_cols = []
 
+    def fit(self, X, y=None):
+        # 1. FIT: Chỉ cần tìm ra cột nào là cột số
+        self.num_cols = X.select_dtypes(include=[np.number]).columns
+        return self
+    
+    def transform(self, X):
+        # 2. TRANSFORM: Áp dụng fill
+        df = X.copy()
+        if not self.num_cols.empty:
+            # Dùng ffill để điền NaNs bằng giá trị quá khứ
+            df[self.num_cols] = df[self.num_cols].ffill().bfill()
+        return df
+    
 class TimeFeatures(BaseEstimator, TransformerMixin):
     """Create time-based features (seasonal, cyclical)."""
     def fit(self, X, y=None):
@@ -89,6 +110,7 @@ class DropTextCols(BaseEstimator, TransformerMixin):
 def create_feature_pipeline():
     """Create Scikit-learn Pipeline for feature engineering."""
     feature_pipeline = Pipeline([
+        ('imputer', FFillImputer()),
         ('time', TimeFeatures()),
         ('weather_text', TextFeatureTransformer()),
         ('lags', LagRollingFeatures(
