@@ -3,7 +3,10 @@ import os
 import joblib
 import pandas as pd
 import config  # Import your config file
-import xgboost # Import xgboost để giúp skl2onnx nhận diện
+import xgboost
+from skl2onnx import update_registered_converter
+import onnxmltools.convert.xgboost.operator_converters.XGBoost #import convert_xgboost
+# from onnxmltools.convert.xgboost.shape_calculator import calculate_linear_regressor_output_shapes
 
 # Import thư viện ONNX
 from skl2onnx import convert_sklearn
