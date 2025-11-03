@@ -1,0 +1,23 @@
+# Data Science & ML Core
+pandas
+numpy
+scikit-learn
+xgboost
+
+# Hyperparameter Tuning
+optuna
+optuna-integration[xgboost]
+
+## Experiment Tracking
+clearml
+
+# Web App & Visualization
+streamlit
+matplotlib
+seaborn
+
+# Utilities
+pyyaml     # Dùng để đọc/ghi file .yaml (lưu metrics, params)
+openpyxl   # Bắt buộc phải có để pandas đọc file .xlsx
+skl2onnx 
+onnxmltools
