@@ -43,12 +43,9 @@ class TimeFeatures(BaseEstimator, TransformerMixin):
         df["cos_week"] = np.cos(2 * np.pi * df["weekofyear"] / 52)
         return df
 
-# ======================================================
-# === CLASS NÀY ĐÃ ĐƯỢC TỐI ƯU HÓA ĐỂ TRÁNH FRAGMENTATION ===
-# ======================================================
 class LagRollingFeatures(BaseEstimator, TransformerMixin):
     """
-    Tối ưu hóa: Tạo Rolling (Xu hướng) và dùng pd.concat
+    Tối ưu hóa: Chỉ tạo Rolling (Xu hướng) và dùng pd.concat
     để tránh bị "fragmented" (phân mảnh).
     """
     def __init__(self, lag_cols, lags, windows):
@@ -63,22 +60,19 @@ class LagRollingFeatures(BaseEstimator, TransformerMixin):
         df = X.copy()
         df = df.sort_values("datetime").reset_index(drop=True) 
         
-        # 1. Tạo một list rỗng để chứa tất cả các feature mới
         features_list = []
 
         for col in self.lag_cols:
             if col in df.columns:
                 
-                # (Vòng lặp LAGS đã bị tắt)
+                # (Vòng lặp LAGS đã bị tắt trong config.py)
                 for lag in self.lags:
                     df[f"{col}_lag{lag}"] = df[col].shift(lag)
-
+                
                 # Chỉ chạy vòng lặp Rolling (Xu hướng)
                 for win in self.windows:
-                    # Dùng shift(1) để tránh data leakage
                     rolling_series = df[col].shift(1).rolling(win, min_periods=1)
                     
-                    # 2. Tạo feature (Series) và ĐẶT TÊN cho nó
                     roll_mean = rolling_series.mean()
                     roll_mean.name = f"{col}_rollmean{win}"
                     
@@ -91,7 +85,6 @@ class LagRollingFeatures(BaseEstimator, TransformerMixin):
                     roll_min = rolling_series.min()
                     roll_min.name = f"{col}_rollmin{win}"
                     
-                    # 3. Thêm các feature mới vào list
                     features_list.extend([roll_mean, roll_std, roll_max, roll_min])
 
                     if col in ['precip', 'solarradiation', 'solarenergy', 'snowdepth', 'is_rain']:
@@ -99,56 +92,40 @@ class LagRollingFeatures(BaseEstimator, TransformerMixin):
                         roll_sum.name = f"{col}_rollsum{win}"
                         features_list.append(roll_sum)
         
-        # 4. Ghép (CONCAT) tất cả các feature mới MỘT LẦN
         features_df = pd.concat(features_list, axis=1)
-        
-        # 5. Ghép DataFrame gốc với các feature mới
         df = pd.concat([df, features_df], axis=1)
         
         return df
-# ======================================================
-# === KẾT THÚC PHẦN TỐI ƯU HÓA ===
-# ======================================================
 
-# class TextFeatureTransformer(BaseEstimator, TransformerMixin):
-#     """
-#     SỬA LẠI: Tạo feature "hôm qua có mưa không"
-#     (an toàn, không leakage).
-#     """
-#     def __init__(self):
-#         self.text_cols = ['conditions'] # Các cột text thô
-
-#     def fit(self, X, y=None):
-#         return self
-        
-#     def transform(self, X):
-#         df = X.copy()
-#         for col in self.text_cols:
-#             if col in df.columns:
-#                 # 1. Tạo lag1 (dữ liệu text của hôm qua)
-#                 col_lag1 = f"{col}_lag1"
-#                 df[col_lag1] = df[col].shift(1).astype(str).str.lower()
-                
-#                 # 2. Tạo feature từ lag1
-#                 df[f"is_rain_yesterday"] = df[col_lag1].str.contains("rain", na=False).astype(int)
-#                 df[f"is_cloudy_yesterday"] = df[col_lag1].str.contains("cloud", na=False).astype(int)
-#                 df[f"is_clear_yesterday"] = df[col_lag1].str.contains("clear", na=False).astype(int)
-#         return df
+# === XÓA CLASS TextFeatureTransformer (vì nó vi phạm luật "chỉ dùng xu hướng") ===
 
 class DropRawFeatures(BaseEstimator, TransformerMixin):
     """
-    XÓA TẤT CẢ (29) cột thô (raw) để tránh data leakage.
+    XÓA TẤT CẢ các cột thô (raw) VÀ CÁC CỘT TARGET
+    để tránh data leakage.
     """
     def __init__(self):
+        # Liệt kê TẤT CẢ các cột thô
         self.raw_cols_to_drop = [
-            "temp", "tempmax", "tempmin", "feelslikemax", "feelslikemin", "feelslike",
+            # Biến mục tiêu gốc
+            "temp", 
+            
+            # 28 Cột thô
+            "tempmax", "tempmin", "feelslikemax", "feelslikemin", "feelslike",
             "dew", "humidity", "precip", "precipprob", "precipcover",
             "preciptype", "snow", "snowdepth", "windgust", "windspeed", 
             "winddir", "sealevelpressure", "cloudcover", "visibility", 
             "solarradiation", "solarenergy", "uvindex", "severerisk", 
             "sunrise", "sunset", "moonphase", "conditions", "datetime",
+            
+            # Cột 0/1 (cũng là raw data của Ngày T, PHẢI XÓA)
             "is_rain", "is_cloudy", "is_clear",
-            "stations", "description", "icon", "name"
+            
+            # Cột thừa (nếu có)
+            "stations", "description", "icon", "name",
+            
+            # === THÊM CÁC CỘT TARGET MỚI VÀO ĐÂY ĐỂ XÓA ===
+            "target_t1", "target_t3", "target_t5", "target_t7"
         ]
 
     def fit(self, X, y=None):
@@ -169,13 +146,15 @@ def create_feature_pipeline():
     feature_pipeline = Pipeline([
         ('imputer', FFillImputer()),
         ('time', TimeFeatures()),
-        # ('weather_text', TextFeatureTransformer()), 
+        
+        # ('weather_text', TextFeatureTransformer()), # <-- ĐÃ XÓA
+        
         ('lags_rolling', LagRollingFeatures( 
             lag_cols=config.LAG_COLS, 
             lags=config.LAGS, 
             windows=config.WINDOWS
         )),
-        ('drop_raw', DropRawFeatures()) 
+        ('drop_raw', DropRawFeatures()) # Bước dọn dẹp cuối cùng
     ])
     return feature_pipeline
 

@@ -27,7 +27,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 # ======================================================
 RAW_FILE_NAME = "HCMWeatherDaily.xlsx" 
 TARGET_COL = "temp" # Biến mục tiêu (sẽ bị xóa khỏi features)
-
+TARGET_FORECAST_COLS = ["target_t1", "target_t3", "target_t5", "target_t7"]
 # ======================================================
 # 4. DATA SPLIT PARAMETERS
 # ======================================================

@@ -20,6 +20,12 @@ def load_and_clean_raw(file_path):
     df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.sort_values("datetime").reset_index(drop=True)
 
+    print("Create future target labels (T+1, T+3, T+5, T+7)")
+    target = df[config.TARGET_COL]
+    df["target_t1"] = target.shift(-1)
+    df["target_t3"] = target.shift(-3)
+    df["target_t5"] = target.shift(-5)
+    df["target_t7"] = target.shift(-7)
     # ======================================================
     # === THÊM BƯỚC NÀY (Convert Text sang 0/1) ===
     # ======================================================

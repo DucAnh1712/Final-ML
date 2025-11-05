@@ -5,27 +5,26 @@ import numpy as np
 import joblib
 import yaml
 import optuna
-# Xóa import Pruning để tránh lỗi
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_squared_error
 from xgboost import XGBRegressor
-# from clearml import Task # <-- Comment/Xóa nếu không dùng
+from clearml import Task # <-- Bạn đang dùng ClearML, giữ lại
 
 # Import from other files
 import config
 from feature_engineering import create_feature_pipeline
 
 # ======================================================
-# HÀM NÀY ĐÃ ĐƯỢC SỬA LẠI HOÀN TOÀN ĐỂ FIX LỖI DATA ALIGNMENT
+# === HÀM MỚI: TẢI DỮ LIỆU CHO NHIỀU TARGET ===
 # ======================================================
-def load_features_for_tuning(target_col):
+def load_features_for_tuning_multi(target_cols_list):
     """
-    Tải features (X) từ feature_data/ và target (y) từ processed_data/
-    để đảm bảo không có data leakage và dữ liệu được đồng bộ.
+    Tải features (X) từ feature_data/
+    Tải TẤT CẢ các targets (y) từ processed_data/
     """
-    print("🔍 Loading aligned data for tuning (X from features, y from processed)...")
+    print("🔍 Loading aligned data for tuning (X from features, Y-dict from processed)...")
     
     # 1. Tải FEATURES (X) (Đã được tạo và dropna)
     train_feat_X_path = os.path.join(config.FEATURE_DIR, "feature_train.csv")
@@ -40,7 +39,7 @@ def load_features_for_tuning(target_col):
     val_feat_X = pd.read_csv(val_feat_X_path)
     X_tune = pd.concat([train_feat_X, val_feat_X], ignore_index=True)
 
-    # 2. Tải dữ liệu PROCESSED (Để lấy y)
+    # 2. Tải dữ liệu PROCESSED (Để lấy TẤT CẢ CÁC CỘT Y)
     train_proc_path = os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv")
     val_proc_path = os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv")
     
@@ -52,9 +51,7 @@ def load_features_for_tuning(target_col):
     train_proc = pd.read_csv(train_proc_path)
     val_proc = pd.read_csv(val_proc_path)
     
-    # 3. CĂN CHỈNH (ALIGN) y VỚI X
-    # feature_engineering.py đã "dropna()" các hàng đầu tiên của train_feat_X
-    
+    # 3. CĂN CHỈNH (ALIGN) y VỚI X (Căn chỉnh các hàng bị drop ở ĐẦU)
     original_train_len = len(train_proc)
     new_train_len = len(train_feat_X)
     rows_dropped_at_start = original_train_len - new_train_len
@@ -64,30 +61,32 @@ def load_features_for_tuning(target_col):
         
     print(f"Aligning data: {rows_dropped_at_start} rows were dropped from train set by feature_engineering (due to rolling windows).")
 
-    # Lấy y (target) từ các file processed, BỎ ĐI các hàng đầu tiên
-    y_train = train_proc[target_col].iloc[rows_dropped_at_start:]
-    y_val = val_proc[target_col] # Tập val không bị dropna
+    # Tạo một dictionary (từ điển) cho các Y
+    y_tune_dict = {}
+    
+    for target_name in target_cols_list:
+        # Lấy y (target) từ các file processed, BỎ ĐI các hàng đầu tiên
+        y_train = train_proc[target_name].iloc[rows_dropped_at_start:]
+        y_val = val_proc[target_name] # Tập val không bị dropna
 
-    y_tune = pd.concat([y_train, y_val], ignore_index=True)
+        y_tune = pd.concat([y_train, y_val], ignore_index=True)
+        
+        # Lưu y (vẫn còn NaN ở cuối) vào dictionary
+        y_tune_dict[target_name] = y_tune
 
-    # 4. Kiểm tra lần cuối
-    if len(X_tune) != len(y_tune):
-        raise ValueError(
-            f"Data misalignment: X_tune has {len(X_tune)} rows, "
-            f"but y_tune has {len(y_tune)} rows. "
-        )
+    # 4. Kiểm tra
+    if len(X_tune) != len(y_tune_dict[target_cols_list[0]]):
+        raise ValueError("Data misalignment after start alignment. Check logic.")
         
     obj_cols = X_tune.select_dtypes(include=['object']).columns
     if not obj_cols.empty:
         print(f"⚠️ Dropping object columns from X_tune: {list(obj_cols)}")
         X_tune = X_tune.drop(columns=obj_cols)
 
-    return X_tune, y_tune
+    # Trả về X (đã căn chỉnh start) và Dict Y (đã căn chỉnh start, còn NaN ở end)
+    return X_tune, y_tune_dict
 # ======================================================
 
-# ======================================================
-# HÀM NÀY ĐÃ SỬA LẠI (Bản đơn giản) ĐỂ TRÁNH LỖI PHIÊN BẢN
-# ======================================================
 def xgb_objective(trial, X, y):
     """Objective function for Optuna (Bản đơn giản, không Pruning)."""
     tscv = TimeSeriesSplit(n_splits=config.CV_SPLITS)
@@ -119,87 +118,129 @@ def xgb_objective(trial, X, y):
         rmse_scores.append(np.sqrt(mean_squared_error(y_val, preds)))
 
     return np.mean(rmse_scores)
-# ======================================================
 
+# ======================================================
+# === HÀM MAIN ĐÃ ĐƯỢC VIẾT LẠI HOÀN TOÀN ===
+# ======================================================
 def main():
-    """Main pipeline: Tune -> Create Final Pipeline -> Retrain -> Save."""
+    """Main pipeline: Chạy 4 lần, 1 lần cho mỗi target."""
     
     # 1. Initialize ClearML (Step 5)
-    # task = Task.init(...) # <-- Tắt nếu không dùng
+    task = Task.init(
+        project_name=config.CLEARML_PROJECT_NAME,
+        task_name=config.CLEARML_TASK_NAME,
+        tags=["Optuna", "XGBoost", "Multi-Target", "RollingOnly"]
+    )
     
-    # 2. Load data (for tuning only)
-    X_tune, y_tune = load_features_for_tuning(target_col=config.TARGET_COL)
+    # 1. Tải dữ liệu (cho Optuna)
+    # X_tune: DataFrame (features)
+    # y_tune_dict: Dictionary {"target_T1": Series, "target_T3": Series, ...}
+    X_tune_full, y_tune_dict_full = load_features_for_tuning_multi(
+        config.TARGET_FORECAST_COLS
+    )
 
-    # 3. Run Optuna
-    print(f"🚀 Starting Optuna tuning ({config.OPTUNA_TRIALS} trials)...")
-    study = optuna.create_study(direction="minimize")
-    study.optimize(lambda trial: xgb_objective(trial, X_tune, y_tune), n_trials=config.OPTUNA_TRIALS)
+    # Dictionary để lưu các params tốt nhất
+    all_best_params = {}
+
+    # === BỌC TRONG VÒNG LẶP ===
+    for target_name in config.TARGET_FORECAST_COLS:
+        print(f"\n🚀🚀🚀 Bắt đầu quy trình cho: {target_name} 🚀🚀🚀")
+        
+        y_tune = y_tune_dict_full[target_name]
+        
+        # === CĂN CHỈNH (ALIGN) END ===
+        # Quan trọng: Xóa các hàng NaN ở cuối (do shift) CỦA TARGET NÀY
+        valid_indices_tune = y_tune.dropna().index
+        X_tune_aligned = X_tune_full.loc[valid_indices_tune]
+        y_tune_aligned = y_tune.loc[valid_indices_tune]
+        
+        print(f"Aligning data for {target_name}: Dropped {len(y_tune) - len(valid_indices_tune)} NaN rows from end.")
+        
+        # 3. Run Optuna (Cho target này)
+        print(f"🚀 Starting Optuna tuning for {target_name}...")
+        study = optuna.create_study(direction="minimize")
+        study.optimize(
+            lambda trial: xgb_objective(trial, X_tune_aligned, y_tune_aligned), 
+            n_trials=config.OPTUNA_TRIALS
+        )
+        
+        best_params = study.best_params
+        all_best_params[target_name] = best_params
+        print(f"🏆 Best Params found for {target_name}: {best_params}")
+        
+        # Log to ClearML
+        task.connect(best_params, name=f'Best Hyperparameters ({target_name})')
+        task.get_logger().report_scalar(f"best_rmse ({target_name})", "RMSE", value=study.best_value, iteration=0)
+
+        # 4. Tạo Production Pipeline (Cho target này)
+        print(f"🛠️ Creating final production pipeline for {target_name}...")
+        production_pipeline = Pipeline([
+            ('feature_engineering', create_feature_pipeline()),
+            ('scaler', RobustScaler()),
+            ('model', XGBRegressor(**best_params, random_state=42, n_jobs=-1))
+        ])
+
+        # 5. Retrain (Cho target này)
+        print(f"🔄 Retraining pipeline on (Train + Val) for {target_name}...")
+        train_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
+        val_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv"))
+        all_train_data = pd.concat([train_df, val_df], ignore_index=True)
+        all_train_data = all_train_data.sort_values("datetime").reset_index(drop=True)
+        
+        # Tách X và y (dùng đúng target_name)
+        y_train_full = all_train_data[target_name]
+        
+        # X_train_full là TẤT CẢ, nhưng phải drop các cột target khác
+        # và cột 'temp' gốc
+        cols_to_drop_prod = config.TARGET_FORECAST_COLS + [config.TARGET_COL]
+        X_train_full = all_train_data.drop(columns=cols_to_drop_prod, errors='ignore')
+        
+        # Căn chỉnh (Align) END cho Production
+        valid_indices_prod = y_train_full.dropna().index
+        X_train_full_aligned = X_train_full.loc[valid_indices_prod]
+        y_train_full_aligned = y_train_full.loc[valid_indices_prod]
+
+        production_pipeline.fit(X_train_full_aligned, y_train_full_aligned)
+
+        # 6. Lưu Model (Cho target này)
+        model_name = f"{target_name}_pipeline.pkl"
+        model_path = os.path.join(config.MODEL_DIR, model_name)
+        joblib.dump(production_pipeline, model_path)
+        print(f"✅ Production pipeline saved to: {model_path}")
     
-    best_params = study.best_params
-    print(f"🏆 Best Params found: {best_params}")
-    
-    # Log best params to ClearML
-    # task.connect(best_params, name='Best Hyperparameters') # <-- Tắt nếu không dùng
-    # task.get_logger().report_scalar(...) # <-- Tắt nếu không dùng
+        # ======================================================
+        # 7. SAVE TO ONNX FORMAT (STEP 9) (Cho target này)
+        # ======================================================
+        print(f"🛠️ Creating ONNX components for {target_name}...")
+        
+        scaler = RobustScaler() 
+        scaler.fit(X_tune_aligned) # Dùng X_tune đã căn chỉnh cho target này
+        
+        X_train_scaled = scaler.transform(X_tune_aligned)
 
-    # 4. CREATE FINAL PRODUCTION PIPELINE
-    print("🛠️ Creating final production pipeline...")
-    production_pipeline = Pipeline([
-        ('feature_engineering', create_feature_pipeline()),
-        ('scaler', RobustScaler()),
-        ('model', XGBRegressor(**best_params, random_state=42, n_jobs=-1))
-    ])
+        model_xgb = XGBRegressor(**best_params, random_state=42, n_jobs=-1)
+        model_xgb.fit(X_train_scaled, y_tune_aligned)
 
-    # 5. RETRAIN ON FULL (TRAIN + VAL) DATASET
-    print("🔄 Retraining pipeline on (Train + Val)...")
-    train_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
-    val_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv"))
-    
-    all_train_data = pd.concat([train_df, val_df], ignore_index=True)
-    all_train_data["datetime"] = pd.to_datetime(all_train_data["datetime"])
-    all_train_data = all_train_data.sort_values("datetime").reset_index(drop=True)
-
-    X_train_full = all_train_data.drop(columns=[config.TARGET_COL], errors='ignore')
-    y_train_full = all_train_data[config.TARGET_COL]
-
-    production_pipeline.fit(X_train_full, y_train_full)
-
-    # 6. SAVE PIPELINE
-    model_path = os.path.join(config.MODEL_DIR, config.MODEL_NAME)
-    joblib.dump(production_pipeline, model_path)
-    print(f"✅ Production pipeline saved to: {model_path}")
-    
-    # ======================================================
-    # 7. SAVE TO ONNX FORMAT (STEP 9) - ĐÃ SỬA LẠI
-    # ======================================================
-    print("🛠️ Creating ONNX-convertible components (Scaler + Model)...")
-
-    scaler = RobustScaler() 
-    X_train_full_feat, y_train_full_feat = load_features_for_tuning(config.TARGET_COL)
-    scaler.fit(X_train_full_feat)
-    
-    X_train_scaled = scaler.transform(X_train_full_feat)
-
-    model_xgb = XGBRegressor(**best_params, random_state=42, n_jobs=-1)
-    model_xgb.fit(X_train_scaled, y_train_full_feat)
-
-    # 4. LƯU 2 FILE RIÊNG BIỆT
-    scaler_path = os.path.join(config.MODEL_DIR, "scaler_for_onnx.pkl")
-    joblib.dump(scaler, scaler_path)
-    print(f"✅ ONNX Scaler saved to: {scaler_path}")
-    
-    model_json_path = os.path.join(config.MODEL_DIR, "model_for_onnx.json")
-    model_xgb.save_model(model_json_path)
-    print(f"✅ ONNX XGBoost Model saved to: {model_json_path}")
-    # ======================================================
+        # 4. LƯU 2 FILE RIÊNG BIỆT (với tên target)
+        scaler_name = f"scaler_{target_name}.pkl"
+        model_json_name = f"model_{target_name}.json"
+        
+        scaler_path = os.path.join(config.MODEL_DIR, scaler_name)
+        joblib.dump(scaler, scaler_path)
+        print(f"✅ ONNX Scaler saved to: {scaler_path}")
+        
+        model_json_path = os.path.join(config.MODEL_DIR, model_json_name)
+        model_xgb.save_model(model_json_path)
+        print(f"✅ ONNX XGBoost Model saved to: {model_json_path}")
+        # ======================================================
 
     # Save best_params.yaml
-    params_path = os.path.join(config.MODEL_DIR, "best_params.yaml")
+    params_path = os.path.join(config.MODEL_DIR, "all_best_params.yaml")
     with open(params_path, "w") as f:
-        yaml.dump(best_params, f)
+        yaml.dump(all_best_params, f)
     
-    # task.close() # <-- Tắt nếu không dùng
-    print("🎉 Training complete!")
+    task.close()
+    print("\n🎉🎉🎉 Completed training. 🎉🎉🎉")
 
 if __name__ == "__main__":
     main()
