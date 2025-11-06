@@ -1,20 +1,45 @@
-RMSE: !!python/object/apply:numpy._core.multiarray.scalar
-- !!python/object/apply:numpy.dtype
-  args:
-  - f8
-  - false
-  - true
-  state: !!python/tuple
-  - 3
-  - <
-  - null
-  - null
-  - null
-  - -1
-  - -1
-  - 0
-- !!binary |
-  0i0J9A+G8D8=
-MAE: 0.8346959948338024
-R2: 0.5710564549995888
-MAPE: 0.02885910721915891
+target_t1:
+  RMSE: !!python/object/apply:numpy._core.multiarray.scalar
+  - &id001 !!python/object/apply:numpy.dtype
+    args:
+    - f8
+    - false
+    - true
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - !!binary |
+    /zongB1D8j8=
+  MAE: 0.9335311327142229
+  R2: 0.4760866469631422
+  MAPE: 0.03224998630636952
+target_t3:
+  RMSE: !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    6/NBP/uz8j8=
+  MAE: 0.9574514901556936
+  R2: 0.4512760737475078
+  MAPE: 0.03309782862090372
+target_t5:
+  RMSE: !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    Ws3uZ6Pg8j8=
+  MAE: 0.9621556701920544
+  R2: 0.4417944379491744
+  MAPE: 0.03327277419634629
+target_t7:
+  RMSE: !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    0xOJ6cDR8j8=
+  MAE: 0.9549163720379137
+  R2: 0.4465851361302605
+  MAPE: 0.033058954971813534

@@ -8,9 +8,10 @@ import optuna
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import mean_squared_error
+# === THÊM METRICS ĐỂ CHECK OVERFITTING ===
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from xgboost import XGBRegressor
-from clearml import Task # <-- Bạn đang dùng ClearML, giữ lại
+from clearml import Task 
 
 # Import from other files
 import config
@@ -94,12 +95,14 @@ def xgb_objective(trial, X, y):
 
     params = {
         'n_estimators': trial.suggest_int("n_estimators", 100, 1000),
-        'max_depth': trial.suggest_int("max_depth", 3, 10),
+        'max_depth': trial.suggest_int("max_depth", 2, 6),
         'learning_rate': trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
         'subsample': trial.suggest_float("subsample", 0.6, 1.0),
         'colsample_bytree': trial.suggest_float("colsample_bytree", 0.6, 1.0),
         'gamma': trial.suggest_float("gamma", 0.0, 5.0),
-        'min_child_weight': trial.suggest_int("min_child_weight", 1, 10),
+        'min_child_weight': trial.suggest_int("min_child_weight", 5, 20),
+        'reg_alpha': trial.suggest_float("reg_alpha", 0.0, 5.0),
+        'reg_lambda': trial.suggest_float("reg_lambda", 0.0, 5.0),
         'random_state': 42,
         'n_jobs': -1
     }
@@ -133,8 +136,6 @@ def main():
     )
     
     # 1. Tải dữ liệu (cho Optuna)
-    # X_tune: DataFrame (features)
-    # y_tune_dict: Dictionary {"target_T1": Series, "target_T3": Series, ...}
     X_tune_full, y_tune_dict_full = load_features_for_tuning_multi(
         config.TARGET_FORECAST_COLS
     )
@@ -148,7 +149,7 @@ def main():
         
         y_tune = y_tune_dict_full[target_name]
         
-        # === CĂN CHỈNH (ALIGN) END ===
+        # === CĂN CHỈNH (ALIGN) END (Cho Optuna) ===
         # Quan trọng: Xóa các hàng NaN ở cuối (do shift) CỦA TARGET NÀY
         valid_indices_tune = y_tune.dropna().index
         X_tune_aligned = X_tune_full.loc[valid_indices_tune]
@@ -202,6 +203,43 @@ def main():
 
         production_pipeline.fit(X_train_full_aligned, y_train_full_aligned)
 
+        # ======================================================
+        # 5B. TÍNH VÀ LƯU TRAIN METRICS (ĐỂ CHECK OVERFITTING)
+        # ======================================================
+        print(f"📊 Calculating performance on the Training Set for {target_name}...")
+        
+        # Dự đoán trên X_train_full_aligned
+        y_train_pred = production_pipeline.predict(X_train_full_aligned)
+        
+        # y_train_full_aligned là đáp án
+        y_train_actual = y_train_full_aligned
+        
+        # Căn chỉnh (Align) START (Do pipeline tự dropna)
+        if len(y_train_pred) < len(y_train_actual):
+            rows_dropped_at_start_prod = len(y_train_actual) - len(y_train_pred)
+            print(f"Aligning Train predictions: Dropping first {rows_dropped_at_start_prod} rows from actuals.")
+            y_train_actual_aligned = y_train_actual.iloc[rows_dropped_at_start_prod:]
+        else:
+            y_train_actual_aligned = y_train_actual
+
+        train_metrics = {
+            "RMSE": np.sqrt(mean_squared_error(y_train_actual_aligned, y_train_pred)),
+            "MAE": mean_absolute_error(y_train_actual_aligned, y_train_pred),
+            "R2": r2_score(y_train_actual_aligned, y_train_pred)
+        }
+        
+        print("\n--- Training Set Performance ---")
+        print(f"   Train MAE ({target_name}): {train_metrics['MAE']:.4f}")
+        print(f"   Train R2 ({target_name}) : {train_metrics['R2']:.4f}")
+        print("----------------------------------\n")
+        
+        # Lưu file metrics
+        metrics_path = os.path.join(config.OUTPUT_DIR, f"train_metrics_{target_name}.yaml")
+        with open(metrics_path, "w") as f:
+            yaml.dump(train_metrics, f, sort_keys=False)
+        print(f"🧾 Training metrics saved to: {metrics_path}")
+        # ======================================================
+
         # 6. Lưu Model (Cho target này)
         model_name = f"{target_name}_pipeline.pkl"
         model_path = os.path.join(config.MODEL_DIR, model_name)
@@ -221,7 +259,7 @@ def main():
         model_xgb = XGBRegressor(**best_params, random_state=42, n_jobs=-1)
         model_xgb.fit(X_train_scaled, y_tune_aligned)
 
-        # 4. LƯU 2 FILE RIÊNG BIỆT (với tên target)
+        # LƯU 2 FILE RIÊNG BIỆT (với tên target)
         scaler_name = f"scaler_{target_name}.pkl"
         model_json_name = f"model_{target_name}.json"
         
@@ -240,7 +278,7 @@ def main():
         yaml.dump(all_best_params, f)
     
     task.close()
-    print("\n🎉🎉🎉 Completed training. 🎉🎉🎉")
+    print("\n🎉🎉🎉 Completed Training. 🎉🎉🎉")
 
 if __name__ == "__main__":
     main()
