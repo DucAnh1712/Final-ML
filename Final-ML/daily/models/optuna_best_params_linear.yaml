@@ -1,0 +1,53 @@
+best_params:
+  target_t1:
+    model_type: LinearRegression
+  target_t2:
+    model_type: Lasso
+    alpha: 0.005407053316255011
+  target_t3:
+    model_type: LinearRegression
+  target_t4:
+    model_type: LinearRegression
+  target_t5:
+    model_type: LinearRegression
+  target_t6:
+    model_type: LinearRegression
+  target_t7:
+    model_type: LinearRegression
+best_scores:
+  target_t1: 0.7393919207006862
+  target_t2: 0.9461652058019555
+  target_t3: 0.9860091739217209
+  target_t4: 0.9990845112187835
+  target_t5: 1.014497458902635
+  target_t6: 1.0326082985461909
+  target_t7: 1.0375992287038394
+details:
+  target_t1:
+    val_rmse: 0.7393919207006862
+  target_t2:
+    val_rmse: 0.9461652058019555
+  target_t3:
+    val_rmse: 0.9860091739217209
+  target_t4:
+    val_rmse: 0.9990845112187835
+  target_t5:
+    val_rmse: 1.014497458902635
+  target_t6:
+    val_rmse: 1.0326082985461909
+  target_t7:
+    val_rmse: 1.0375992287038394
+config:
+  n_trials: 300
+  search_space:
+    model_type:
+    - LinearRegression
+    - Ridge
+    - Lasso
+    - ElasticNet
+    alpha: !!python/tuple
+    - 0.001
+    - 10.0
+    l1_ratio: !!python/tuple
+    - 0.1
+    - 0.9

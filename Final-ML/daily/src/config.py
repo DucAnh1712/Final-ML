@@ -1,70 +1,60 @@
 # config.py
 import os
 
-# ======================================================
-# 1. ROOT PATH DEFINITION
-# ======================================================
-# Giả định code nằm trong thư mục /src/
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-# ======================================================
-# 2. SUBDIRECTORY DEFINITIONS
-# ======================================================
 RAW_DATA_DIR = os.path.join(PROJECT_ROOT, 'raw_data')
 PROCESSED_DATA_DIR = os.path.join(PROJECT_ROOT, 'processed_data')
-FEATURE_DIR = os.path.join(PROJECT_ROOT, 'feature_data')
+# FEATURE_DIR = os.path.join(PROJECT_ROOT, 'feature_data')
 MODEL_DIR = os.path.join(PROJECT_ROOT, 'models')
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'inference_results')
 
-# Tự động tạo thư mục
 os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
-os.makedirs(FEATURE_DIR, exist_ok=True)
+# os.makedirs(FEATURE_DIR, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # ======================================================
-# 3. DATA PARAMETERS
+# DATA PARAMETERS
 # ======================================================
 RAW_FILE_NAME = "HCMWeatherDaily.xlsx" 
-TARGET_COL = "temp" # Biến mục tiêu (sẽ bị xóa khỏi features)
-TARGET_FORECAST_COLS = ["target_t1", "target_t3", "target_t5", "target_t7"]
+TARGET_COL = "temp"
+TARGET_FORECAST_COLS = ["target_t1", "target_t2", "target_t3", "target_t4", "target_t5", "target_t6", "target_t7"]
+
 # ======================================================
-# 4. DATA SPLIT PARAMETERS
+# DATA SPLIT
 # ======================================================
 TRAIN_RATIO = 0.7
-VAL_RATIO = 0.15
-# TEST_RATIO = 0.15 (tự động)
+VAL_RATIO = 0.15 # 15% Val + 15% Test
 
 # ======================================================
-# 5. FEATURE ENGINEERING PARAMETERS (ĐÃ CẢI THIỆN)
+# MODEL FILENAMES
 # ======================================================
-# Các cột thô dùng để TẠO XU HƯỚNG
-# (Sau đó chúng sẽ bị xóa bởi DropRawFeatures)
-LAG_COLS = [
-    "dew", "humidity", "precip", "windspeed", 
-    "sealevelpressure", "cloudcover", "solarradiation", 
-    "uvindex", "is_rain", "is_cloudy", "is_clear"
-]
+PIPELINE_NAME = "feature_pipeline.pkl"
+SCALER_NAME = "scaler.pkl"
+MODEL_NAME = "model_linear.pkl"
 
-# === YÊU CẦU: CHỈ DÙNG XU HƯỚNG ===
-# Tắt LAGS bằng cách để rỗng
-LAGS = []
-
-# Mở rộng WINDOWS để có nhiều xu hướng hơn ("Cải thiện mô hình")
-WINDOWS = [3, 7, 14, 21, 30]
-# ===================================
+# Result filenames
+BENCHMARK_RESULTS_YAML = "benchmark_results.yaml"
+TRAIN_METRICS_NAME = "train_metrics_linear.yaml"
+OPTUNA_SCRIPT_NAME = "fine_tuning_linear.py"
+OPTUNA_RESULTS_YAML = "optuna_best_params_linear.yaml"
 
 # ======================================================
-# 6. TRAINING PARAMETERS
+# OPTUNA FINE-TUNING
 # ======================================================
-MODEL_NAME = "hcm_temp_pipeline.pkl"
+OPTUNA_TRIALS = 300 
 
-# Tăng số lần thử để "chạy nát" Optuna
-OPTUNA_TRIALS = 200 # (Bạn có thể tăng lên 300, 500)
-CV_SPLITS = 5
+LINEAR_PARAM_RANGES = {
+    # ✅ THÊM 'LinearRegression' VÀO ĐÂY
+    'model_type': ['LinearRegression', 'Ridge', 'Lasso', 'ElasticNet'],
+    
+    'alpha': (1e-3, 10.0), # (log=True)
+    'l1_ratio': (0.1, 0.9)
+}
 
 # ======================================================
-# 7. CLEARML PARAMETERS
+# CLEARML
 # ======================================================
 CLEARML_PROJECT_NAME = "HCM Weather Forecasting"
-CLEARML_TASK_NAME = "XGBoost Optuna Tuning (Rolling Only)"
+CLEARML_TASK_NAME = "LinearModel Fine-Tuning (7-day)"

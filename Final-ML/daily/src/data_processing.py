@@ -1,80 +1,57 @@
 # data_processing.py
 import os
 import pandas as pd
-import numpy as np
-import yaml
-import config # Import from config.py
+import config
 
-def load_and_clean_raw(file_path):
-    """Tải, dọn dẹp và convert text sang 0/1."""
-    print(f"🔍 Loading raw data from: {file_path}")
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"❌ Data file not found at: {file_path}")
-    
-    df = pd.read_excel(file_path)
-    df.columns = [col.strip().lower() for col in df.columns]
-
-    if "datetime" not in df.columns:
-        raise ValueError("❌ Missing 'datetime' column in dataset!")
-        
-    df["datetime"] = pd.to_datetime(df["datetime"])
-    df = df.sort_values("datetime").reset_index(drop=True)
-
-    print("Create future target labels (T+1, T+3, T+5, T+7)")
-    target = df[config.TARGET_COL]
-    df["target_t1"] = target.shift(-1)
-    df["target_t3"] = target.shift(-3)
-    df["target_t5"] = target.shift(-5)
-    df["target_t7"] = target.shift(-7)
-    # ======================================================
-    # === THÊM BƯỚC NÀY (Convert Text sang 0/1) ===
-    # ======================================================
-    print("🔬 Converting 'conditions' text to 0/1 features...")
-    if "conditions" in df.columns:
-        df["conditions_lower"] = df["conditions"].astype(str).str.lower()
-        df["is_rain"] = df["conditions_lower"].str.contains("rain", na=False).astype(int)
-        df["is_cloudy"] = df["conditions_lower"].str.contains("cloud", na=False).astype(int)
-        df["is_clear"] = df["conditions_lower"].str.contains("clear", na=False).astype(int)
-        # Xóa cột trung gian
-        df = df.drop(columns=["conditions_lower"])
-    # ======================================================
-    
-    # Xóa các cột text/metadata không cần thiết
-    drop_cols = ["stations", "description", "icon", "name"]
-    df.drop(columns=[c for c in drop_cols if c in df.columns], inplace=True, errors="ignore")
-
-    print(f"✅ Raw data cleaned successfully. Shape: {df.shape}")
-    return df
-
-def split_by_time(df, train_ratio, val_ratio):
-    """Chia data theo thời gian (train, val, test)."""
-    df = df.sort_values("datetime").reset_index(drop=True)
-    n = len(df)
-    train_end = int(n * train_ratio)
-    val_end = int(n * (train_ratio + val_ratio))
-
-    train_df = df.iloc[:train_end]
-    val_df = df.iloc[train_end:val_end]
-    test_df = df.iloc[val_end:]
-
-    print(f"📊 Data split → Train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}")
-    return train_df, val_df, test_df
-
-def save_data_summary(output_dir, summary):
-    """Lưu tóm tắt dữ liệu ra file YAML."""
-    summary_path = os.path.join(output_dir, "data_summary.yaml")
-    with open(summary_path, "w") as f:
-        yaml.dump(summary, f, sort_keys=False)
-    print(f"🧾 Data summary saved → {summary_path}")
+def create_targets(df, target_col, horizons):
+    """Shifts the target column to create future targets."""
+    df_new = df.copy()
+    for h in horizons:
+        df_new[f'target_t{h}'] = df_new[target_col].shift(-h)
+    return df_new
 
 def main():
-    """Main pipeline: Load -> Clean -> Split -> Save."""
-    raw_file_path = os.path.join(config.RAW_DATA_DIR, config.RAW_FILE_NAME)
-    
-    df = load_and_clean_raw(raw_file_path)
-    train_df, val_df, test_df = split_by_time(df, config.TRAIN_RATIO, config.VAL_RATIO)
+    print("🚀 STARTING DATA PROCESSING (STEP 0)")
+    print("="*70)
 
-    # Lưu các file CSV đã xử lý
+    # 1. Load Raw Data
+    raw_path = os.path.join(config.RAW_DATA_DIR, config.RAW_FILE_NAME)
+    try:
+        df_raw = pd.read_excel(raw_path)
+    except FileNotFoundError:
+        print(f"❌ ERROR: Raw data file not found at: {raw_path}")
+        return
+    except Exception as e:
+        print(f"❌ ERROR reading Excel file: {e}")
+        return
+        
+    print(f"✅ Raw file loaded successfully: {raw_path} (Rows: {len(df_raw)})")
+
+    # 2. Basic processing
+    df_raw['datetime'] = pd.to_datetime(df_raw['datetime'])
+    df_raw = df_raw.sort_values(by='datetime').reset_index(drop=True)
+
+    HORIZONS = [1, 2, 3, 4, 5, 6, 7] # As per new requirement
+    
+    print(f"Creating targets for T+{HORIZONS}...")
+    df_processed = create_targets(df_raw, config.TARGET_COL, HORIZONS)
+
+    # 3. Calculate split points
+    n = len(df_processed)
+    train_end = int(n * config.TRAIN_RATIO)
+    val_end = train_end + int(n * (config.VAL_RATIO))
+
+    print(f"Total rows: {n}")
+    print(f"Train split: 0 -> {train_end}")
+    print(f"Val split:   {train_end} -> {val_end}")
+    print(f"Test split:  {val_end} -> {n}")
+
+    # 4. Split Data
+    train_df = df_processed.iloc[:train_end].copy()
+    val_df = df_processed.iloc[train_end:val_end].copy()
+    test_df = df_processed.iloc[val_end:].copy()
+
+    # 5. Save 3 CSV files
     train_path = os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv")
     val_path = os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv")
     test_path = os.path.join(config.PROCESSED_DATA_DIR, "data_test.csv")
@@ -83,23 +60,11 @@ def main():
     val_df.to_csv(val_path, index=False)
     test_df.to_csv(test_path, index=False)
 
-    print(f"""
-✅ Processed data saved:
-  ┣━ Train: {train_path}
-  ┣━ Val:   {val_path}
-  ┗━ Test:  {test_path}
-""")
-    
-    # Lưu tóm tắt
-    summary = {
-        "total_samples": len(df),
-        "train_samples": len(train_df),
-        "val_samples": len(val_df),
-        "test_samples": len(test_df),
-        "split_ratio": {"train": config.TRAIN_RATIO, "val": config.VAL_RATIO, "test": 1.0 - config.TRAIN_RATIO - config.VAL_RATIO},
-        "raw_file": raw_file_path
-    }
-    save_data_summary(config.PROCESSED_DATA_DIR, summary)
+    print(f"\n✅ Saved data_train.csv (Rows: {len(train_df)})")
+    print(f"✅ Saved data_val.csv (Rows: {len(val_df)})")
+    print(f"✅ Saved data_test.csv (Rows: {len(test_df)})")
+    print("\n🎉 DATA PROCESSING COMPLETE!")
+    print("="*70)
 
 if __name__ == "__main__":
     main()
