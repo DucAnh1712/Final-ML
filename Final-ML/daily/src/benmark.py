@@ -58,13 +58,36 @@ def run_benchmark():
     # 1. LOAD DATA (Train/Val/Test)
     # ======================================================
     print("📂 Loading all data...")
-    train_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
-    val_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv"))
-    test_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_test.csv"))
+    train_df_raw = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
+    val_df_raw = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv"))
+    test_df_raw = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_test.csv"))
     
     target_name = config.TARGET_FORECAST_COLS[0]
+    print(f"🎯 Benchmarking for single target: {target_name}")
+
+    # ✅✅✅ SỬA LỖI: SET DATETIME INDEX TRƯỚC ✅✅✅
+    # Tạo một hàm helper nhỏ để set index cho 3 file
+    def set_datetime_idx(df, file_name):
+        if 'datetime' not in df.columns:
+            raise KeyError(f"❌ Không tìm thấy cột 'datetime' trong file {file_name}")
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        df = df.set_index('datetime', drop=False)
+        df = df.sort_index()
+        return df
+
+    train_df_raw = set_datetime_idx(train_df_raw, "data_train.csv")
+    val_df_raw = set_datetime_idx(val_df_raw, "data_val.csv")
+    test_df_raw = set_datetime_idx(test_df_raw, "data_test.csv")
+    print("   ...Đã set DatetimeIndex cho 3 tệp")
     
-    y_train_raw = train_df[target_name]
+    # Bây giờ mới dropna
+    train_df = train_df_raw.dropna(subset=[target_name]).copy()
+    val_df = val_df_raw.dropna(subset=[target_name]).copy()
+    test_df = test_df_raw.dropna(subset=[target_name]).copy()
+    print(f"   ...Đã dọn dẹp NaN trong cột target")
+
+    # Giờ các biến này sẽ có DatetimeIndex
+    y_train_raw = train_df[target_name] 
     X_train_raw = train_df.copy()
     
     y_val_raw = val_df[target_name]
@@ -74,34 +97,38 @@ def run_benchmark():
     X_test_raw = test_df.copy()
 
     # ======================================================
-    # 2. PREPARE PIPELINE & DATA (Fit/Transform)
+    # 2. PREPARE PIPELINE & DATA (Fit/Transform) - ĐÃ SỬA LỖI
     # ======================================================
     print("🛠️ Preparing data (Fitting NEW pipeline on Train)...")
-    feature_pipeline_fit = create_feature_pipeline() # NEW Pipeline
+    feature_pipeline_fit = create_feature_pipeline()
     scaler_fit = RobustScaler()
 
     # Fit_transform on Train
-    X_train_final, y_train_final = align_data_v2(
-        X_train_raw, y_train_raw, 
-        feature_pipeline_fit, scaler_fit, fit_transform=True
-    )
+    print("   ...Fitting pipeline and scaler on Train data")
+    # ✅ SỬA: Không cần align_data_v2 nữa, nó quá phức tạp
+    # Pipeline được fit trên X (có DatetimeIndex)
+    X_train_feat = feature_pipeline_fit.fit_transform(X_train_raw)
+    X_train_final = pd.DataFrame(scaler_fit.fit_transform(X_train_feat), index=X_train_feat.index, columns=X_train_feat.columns)
     
+    # ✅ SỬA: Căn chỉnh y theo index của X (giờ cả 2 đều là DatetimeIndex)
+    y_train_final = y_train_raw.loc[X_train_final.index] 
+
     # Transform on Val
-    X_val_final, y_val_final = align_data_v2(
-        X_val_raw, y_val_raw, 
-        feature_pipeline_fit, scaler_fit, fit_transform=False
-    )
+    print("   ...Transforming Val data")
+    X_val_feat = feature_pipeline_fit.transform(X_val_raw)
+    X_val_final = pd.DataFrame(scaler_fit.transform(X_val_feat), index=X_val_feat.index, columns=X_val_feat.columns)
+    y_val_final = y_val_raw.loc[X_val_final.index]
     
     # Transform on Test
-    X_test_final, y_test_final = align_data_v2(
-        X_test_raw, y_test_raw, 
-        feature_pipeline_fit, scaler_fit, fit_transform=False
-    )
+    print("   ...Transforming Test data")
+    X_test_feat = feature_pipeline_fit.transform(X_test_raw)
+    X_test_final = pd.DataFrame(scaler_fit.transform(X_test_feat), index=X_test_feat.index, columns=X_test_feat.columns)
+    y_test_final = y_test_raw.loc[X_test_final.index]
     
     print(f"📊 Train data: X={X_train_final.shape}, y={y_train_final.shape}")
     print(f"📊 Val data: X={X_val_final.shape}, y={y_val_final.shape}")
     print(f"📊 Test data: X={X_test_final.shape}, y={y_test_final.shape}")
-
+    
     # ======================================================
     # 3. DEFINE MODELS
     # ======================================================

@@ -19,7 +19,16 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 # ======================================================
 RAW_FILE_NAME = "HCMWeatherDaily.xlsx" 
 TARGET_COL = "temp"
-TARGET_FORECAST_COLS = ["target_t1", "target_t2", "target_t3", "target_t4", "target_t5", "target_t6", "target_t7"]
+# ========================
+# FORECAST HORIZONS
+# ========================
+FORECAST_HORIZONS = [1, 2, 3, 4, 5, 6, 7]  # T+1 đến T+7
+TARGET_FORECAST_COLS = [f"target_t{h}" for h in FORECAST_HORIZONS]
+# ========================
+# CROSS-VALIDATION SETTINGS
+# ========================
+CV_N_SPLITS = 5      # Số folds cho TimeSeriesSplit
+CV_GAP_DAYS = 7      # Gap giữa train và val (khuyến nghị = max horizon)
 
 # ======================================================
 # DATA SPLIT
@@ -49,7 +58,7 @@ LINEAR_PARAM_RANGES = {
     # ✅ THÊM 'LinearRegression' VÀO ĐÂY
     'model_type': ['LinearRegression', 'Ridge', 'Lasso', 'ElasticNet'],
     
-    'alpha': (1e-3, 10.0), # (log=True)
+    'alpha': (1e-5, 1e2), # (log=True)
     'l1_ratio': (0.1, 0.9)
 }
 
@@ -58,3 +67,7 @@ LINEAR_PARAM_RANGES = {
 # ======================================================
 CLEARML_PROJECT_NAME = "HCM Weather Forecasting"
 CLEARML_TASK_NAME = "LinearModel Fine-Tuning (7-day)"
+# ========================
+# MODEL TRAINING
+# ========================
+# FINAL_MODEL_PREFIX = "final_linear_model"  # Prefix cho model files
