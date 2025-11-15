@@ -1,287 +1,154 @@
-# optuna_search_xgboost.py
+# train_lightgbm.py
 import os
 import pandas as pd
 import numpy as np
+import joblib
 import yaml
-import optuna
-import xgboost as xgb # ⬅️ THAY ĐỔI
 from sklearn.preprocessing import RobustScaler
-from sklearn.metrics import mean_squared_error
-from clearml import Task
+import lightgbm as lgb # ⬅️ THAY ĐỔI 1
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from clearml import Task 
 import config
 from feature_engineering import create_feature_pipeline
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
 
-# =============================================================================
-# CUSTOM PURGED TIME SERIES SPLIT (ANTI-LEAKAGE)
-# =============================================================================
-class PurgedTimeSeriesSplit:
-    # (Code của class PurgedTimeSeriesSplit giữ nguyên)
-    def __init__(self, n_splits=5, gap=0):
-        self.n_splits = n_splits
-        self.gap = gap
-    def split(self, X, y=None, groups=None):
-        n_samples = len(X)
-        indices = np.arange(n_samples)
-        test_size = n_samples // (self.n_splits + 1)
-        for i in range(self.n_splits):
-            train_end = (i + 1) * test_size
-            val_start = train_end + self.gap
-            val_end = val_start + test_size
-            if val_end > n_samples:
-                break
-            train_indices = indices[:train_end]
-            val_indices = indices[val_start:val_end]
-            yield train_indices, val_indices
-    def get_n_splits(self, X=None, y=None, groups=None):
-        return self.n_splits
+# ⬅️ THAY ĐỔI 2: Load đúng file params
+def load_optuna_best_params_lgbm():
+    params_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_LIGHTGBM_YAML) # ⬅️ Đổi tên file
+    if not os.path.exists(params_path):
+        raise FileNotFoundError(
+            f"❌ {params_path} not found\n"
+            f"Please run 'python optuna_search_lightgbm.py' first!" # ⬅️ Đổi tên file
+        )
+    with open(params_path, 'r') as f:
+        data = yaml.load(f, Loader=yaml.FullLoader)
+    print(f"✅ Loaded Optuna LightGBM params from: {params_path}")
+    return data['best_params']
 
-# =============================================================================
-# ALIGNMENT FUNCTION (SỬA LỖI DROPNA)
-# =============================================================================
-def align_data_for_tuning(X_raw, y_raw, pipeline, scaler, fit_transform=False):
-    # (Code hàm này giữ nguyên)
-    if fit_transform:
-        X_feat = pipeline.fit_transform(X_raw)
-        X_scaled = scaler.fit_transform(X_feat)
-    else:
-        X_feat = pipeline.transform(X_raw)
-        X_scaled = scaler.transform(X_feat)
-    y_aligned = y_raw.copy()
-    y_aligned.index = X_feat.index 
+# (Hàm align_data_final giữ nguyên)
+def align_data_final(X_feat_scaled_df, y_raw_series):
+    y_aligned = y_raw_series.copy()
+    y_aligned.index = X_feat_scaled_df.index 
     y_df = pd.DataFrame(y_aligned)
-    X_df = pd.DataFrame(X_scaled, index=X_feat.index, columns=X_feat.columns) 
-    combined = pd.concat([y_df, X_df], axis=1)
-    combined_clean = combined.dropna(subset=[y_aligned.name]) 
+    combined = pd.concat([y_df, X_feat_scaled_df], axis=1)
+    combined_clean = combined.dropna(subset=[y_aligned.name])
     y_final = combined_clean[y_aligned.name]
     X_final = combined_clean.drop(columns=[y_aligned.name])
     return X_final, y_final
 
-# =============================================================================
-# DATA LOADING (FIXED - THÊM BƯỚC DROPNA QUAN TRỌNG)
-# =============================================================================
-def load_data_for_tuning(target_name):
-    # (Code hàm này giữ nguyên)
-    print(f"🔍 Loading RAW data (Train + Val COMBINED) for {target_name}...")
+# ⬅️ THAY ĐỔI 3: Tạo model LightGBM
+def create_model_from_params_lgbm(params):
+    model_params = params.copy()
+    model_params.setdefault('random_state', 42)
+    model_params.setdefault('n_jobs', -1)
+    model_params.setdefault('verbose', -1)
+    
+    print(f"   Model: LightGBM (n_estimators={params.get('n_estimators')}, num_leaves={params.get('num_leaves')})")
+    return lgb.LGBMRegressor(**model_params)
+
+def main():
+    task = Task.init(
+        project_name=config.CLEARML_PROJECT_NAME,
+        task_name=config.CLEARML_TASK_NAME + " (LightGBM Production)", # ⬅️ Đổi tên Task
+        ask_name=config.CLEARML_TASK_NAME + " (LightGBM Production)", # ⬅️ Đổi tên Task
+        task_name="Optuna LightGBM (Hourly)"
+        tags=["Production", "LightGBM", "Multi-Horizon", "Hourly"] # ⬅️ Đổi Tags
+    )
+    
+    try:
+        all_best_params = load_optuna_best_params_lgbm() # ⬅️ Gọi hàm mới
+    except FileNotFoundError as e:
+        print(str(e))
+        return
+
+    print(f"🚀 STARTING PRODUCTION TRAINING (LightGBM, Multi-Horizon, Hourly)") # ⬅️ Đổi tên
+    print("="*70)
+
+    # ======================================================
+    # 1. LOAD DATA (Merge Train + Val)
+    # (Copy y hệt từ train_linear.py)
+    # ======================================================
+    print(f"📂 Loading data (Train+Val)...")
     train_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
     val_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv"))
     all_train_data = pd.concat([train_df, val_df], ignore_index=True)
     if 'datetime' not in all_train_data.columns:
          raise KeyError("❌ Không tìm thấy cột 'datetime' trong file CSV.")
-    print(f"   ...Sử dụng cột 'datetime' làm cột thời gian")
     all_train_data['datetime'] = pd.to_datetime(all_train_data['datetime'])
     all_train_data = all_train_data.set_index('datetime', drop=False)
     all_train_data = all_train_data.sort_index()
-    rows_before = len(all_train_data)
-    all_train_data = all_train_data.dropna(subset=[target_name])
-    rows_after = len(all_train_data)
-    if rows_before > rows_after:
-        print(f"   ⚠️ Đã xóa {rows_before - rows_after} hàng có NaN trong cột target.")
-    y_train_full_raw = all_train_data[target_name]
-    X_train_full_raw = all_train_data.copy()
-    print(f"✅ Combined RAW data shapes: X={X_train_full_raw.shape}, y={y_train_full_raw.shape}")
-    print(f"📅 Date range: {X_train_full_raw.index.min()} → {X_train_full_raw.index.max()}")
-    return X_train_full_raw, y_train_full_raw
+    X_train_full = all_train_data.copy()
 
-# =============================================================================
-# ⬅️ THAY ĐỔI 1: HÀM OBJECTIVE CHO XGBOOST
-# =============================================================================
-def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
-    """
-    Objective function cho XGBoost (với Early Stopping)
-    """
-    # ❗️ Đảm bảo bạn đã định nghĩa 'XGBOOST_PARAM_RANGES' trong config.py
-    ranges = config.XGBOOST_PARAM_RANGES 
-    
-    # 1. Suggest hyperparameters
-    # ❗️ Bỏ "num_leaves" (của LGBM), thay bằng các param của XGBoost
-    params = {
-        'learning_rate': trial.suggest_float('learning_rate', *ranges['learning_rate'], log=True),
-        'max_depth': trial.suggest_int('max_depth', *ranges['max_depth']),
-        'subsample': trial.suggest_float('subsample', *ranges['subsample']),
-        'colsample_bytree': trial.suggest_float('colsample_bytree', *ranges['colsample_bytree']),
-        'reg_alpha': trial.suggest_float('reg_alpha', *ranges['reg_alpha'], log=True),
-        'reg_lambda': trial.suggest_float('reg_lambda', *ranges['reg_lambda'], log=True),
-        
-        # --- Tham số cố định cho XGBoost ---
-        'objective': 'reg:squarederror',
-        'booster': 'gbtree',
-        'tree_method': 'hist', 
-        'seed': 42,
-        'n_jobs': -1,
-        'verbosity': 0,
-        'n_estimators': 2000,
-        
-        # ⬅️ THAY ĐỔI 1: Di chuyển early_stopping_rounds LÊN ĐÂY
-        'early_stopping_rounds': 100 
-    }
+    # ======================================================
+    # 2. FIT PIPELINE & SCALER (ONCE)
+    # (Phần này giữ nguyên)
+    # ======================================================
+    feature_pipeline = create_feature_pipeline()
+    scaler = RobustScaler()
+    print("Fitting Feature Pipeline on 85% data...")
+    X_feat_full = feature_pipeline.fit_transform(X_train_full)
+    print("Fitting Scaler on 85% data...")
+    scaler.fit(X_feat_full) 
+    joblib.dump(feature_pipeline, os.path.join(config.MODEL_DIR, config.PIPELINE_NAME))
+    joblib.dump(scaler, os.path.join(config.MODEL_DIR, config.SCALER_NAME))
+    print(f"💾 Feature Pipeline saved to: {config.PIPELINE_NAME}")
+    print(f"💾 Scaler saved to: {config.SCALER_NAME}")
 
-    tscv = PurgedTimeSeriesSplit(
-        n_splits=config.CV_N_SPLITS, 
-        gap=config.CV_GAP_ROWS
-    )
-    fold_scores = []
-    best_iterations = []
-    
-    for fold_num, (train_idx, val_idx) in enumerate(tscv.split(X_all_train_raw)):
-        # (Phần xử lý data, pipeline, scaler giữ nguyên...)
-        X_train_fold_raw = X_all_train_raw.iloc[train_idx]
-        y_train_fold_raw = y_all_train_raw.iloc[train_idx]
-        X_val_fold_raw = X_all_train_raw.iloc[val_idx]
-        y_val_fold_raw = y_all_train_raw.iloc[val_idx]
-        
-        if fold_num == 0:
-            train_dates_col = X_train_fold_raw['datetime'] 
-            val_dates_col = X_val_fold_raw['datetime']
-            gap_duration = (val_dates_col.min() - train_dates_col.max())
-            print(f"   ✅ Fold 1 verified:")
-            print(f"       Train: {train_dates_col.min()} → {train_dates_col.max()}")
-            print(f"       Gap:   {gap_duration} (approx {config.CV_GAP_DAYS} days)")
-            print(f"       Val:   {val_dates_col.min()} → {val_dates_col.max()}")
+    # ======================================================
+    # 3. LOOP AND TRAIN EACH MODEL
+    # ======================================================
+    all_train_metrics = {}
+    X_scaled_full = scaler.transform(X_feat_full)
+    X_scaled_full_df = pd.DataFrame(X_scaled_full, index=X_feat_full.index, columns=X_feat_full.columns)
 
-        feature_pipeline_fold = create_feature_pipeline()
-        scaler_fold = RobustScaler()
-        X_train_fold, y_train_fold = align_data_for_tuning(
-            X_train_fold_raw, y_train_fold_raw, 
-            feature_pipeline_fold, scaler_fold, 
-            fit_transform=True
+    for target_name in config.TARGET_FORECAST_COLS: 
+        print("\n" + "="*30)
+        print(f"🎯 Training LightGBM for: {target_name}") # ⬅️ Đổi tên
+        print("="*30)
+        
+        y_train_full = all_train_data[target_name]
+
+        X_final_train, y_final_train = align_data_final(
+            X_scaled_full_df, y_train_full
         )
-        X_val_fold, y_val_fold = align_data_for_tuning(
-            X_val_fold_raw, y_val_fold_raw, 
-            feature_pipeline_fold, scaler_fold, 
-            fit_transform=False
-        )
+        print(f"📊 Final training data (aligned): X={X_final_train.shape}, y={y_final_train.shape}")
+        
+        if target_name not in all_best_params:
+            print(f"⚠️ Tuned params not found for {target_name}. Using default LightGBM.")
+            model = lgb.LGBMRegressor(n_jobs=-1, random_state=42, verbose=-1) # ⬅️ Đổi default
+        else:
+            best_params = all_best_params[target_name]
+            task.connect(best_params, name=f'Best Params ({target_name})')
+            model = create_model_from_params_lgbm(best_params) # ⬅️ Gọi hàm mới
+        
+        print(f"⏳ Training final {target_name} model...")
+        model.fit(X_final_train, y_final_train)
+        print(f"✅ Training complete!")
 
-        model = xgb.XGBRegressor(**params) # ⬅️ params bây giờ đã chứa 'early_stopping_rounds'
-        
-        if X_train_fold.empty or y_train_fold.empty:
-            print(f"   ⚠️ Fold {fold_num+1} rỗng. Bỏ qua.")
-            continue
-
-        model.fit(
-            X_train_fold, y_train_fold,
-            eval_set=[(X_val_fold, y_val_fold)],
-            # ⬅️ THAY ĐỔI 2: Xóa tham số 'early_stopping_rounds' khỏi đây
-            verbose=False
-        )
-        
-        # (Phần còn lại của hàm giữ nguyên)
-        best_iteration = model.best_iteration
-        if best_iteration is None or best_iteration <= 0:
-            best_iteration = params['n_estimators'] 
-        best_iterations.append(best_iteration)
-            
-        y_val_pred = model.predict(X_val_fold)
-        
-        val_rmse = np.sqrt(mean_squared_error(y_val_fold, y_val_pred))
-        fold_scores.append(val_rmse)
-    
-    final_rmse = np.mean(fold_scores)
-    avg_best_iteration = int(np.mean(best_iterations)) 
-    
-    trial.set_user_attr("val_rmse", float(final_rmse))
-    trial.set_user_attr("avg_best_iteration", avg_best_iteration) 
-    
-    # ❗️ QUAN TRỌNG: Loại bỏ 'early_stopping_rounds' khỏi kết quả
-    #    Nếu không, nó sẽ bị Optuna báo lỗi khi lưu vào trial.params
-    #    Chúng ta chỉ cần nó khi train, không cần nó trong bộ params
-    if 'early_stopping_rounds' in params:
-        del params['early_stopping_rounds']
-    
-    return final_rmse
-
-# =============================================================================
-# ⬅️ THAY ĐỔI 2: HÀM MAIN
-# =============================================================================
-def run_optuna_search_xgboost(): # ⬅️ Đổi tên hàm
-    task = Task.init(
-        project_name=config.CLEARML_PROJECT_NAME,
-        task_name="Optuna XGBoost (Hourly)", # ⬅️ Đổi tên
-        tags=["Optuna", "XGBoost", "Multi-Horizon", "Purged-CV", "Hourly"] # ⬅️ Đổi Tag
-    )
-    
-    all_best_params = {}
-    all_best_scores = {}
-    all_best_details = {}
-
-    for target_name in config.TARGET_FORECAST_COLS:
-        print("\n" + "="*80)
-        print(f"🎯 TUNING XGBOOST FOR: {target_name}") # ⬅️ Đổi tên
-        print("="*80)
-    
-        X_all_train_raw, y_all_train_raw = load_data_for_tuning(target_name)
-        
-        print(f"🔍 Starting Optuna search (XGBoost)...") # ⬅️ Đổi tên
-        print(f"   Strategy: {config.CV_N_SPLITS}-Fold Purged TimeSeriesSplit (Gap={config.CV_GAP_ROWS} rows/hours)")
-        print(f"   Trials:   {config.OPTUNA_TRIALS}")
-        print(f"   ⚠️   This will take time...\n")
-        
-        study = optuna.create_study(direction="minimize")
-        study.optimize(
-            lambda trial: xgboost_objective(trial, X_all_train_raw, y_all_train_raw), # ⬅️ Gọi hàm objective mới
-            n_trials=config.OPTUNA_TRIALS,
-            show_progress_bar=True
-        )
-        
-        best_trial = study.best_trial
-        best_params = best_trial.params # Đây là dict các giá trị Optuna tìm được
-        
-        val_rmse = best_trial.user_attrs.get("val_rmse", 0)
-        avg_best_iter = best_trial.user_attrs.get("avg_best_iteration", 0) 
-
-        # GHI ĐÈ 'n_estimators' bằng số vòng lặp tìm được
-        best_params['n_estimators'] = avg_best_iter
-
-        all_best_params[target_name] = best_params
-        all_best_scores[target_name] = float(val_rmse)
-        all_best_details[target_name] = {
-            "val_rmse": float(val_rmse), 
-            "avg_best_iteration": avg_best_iter, # ⬅️ MỚI: Lưu lại
-            "n_folds": config.CV_N_SPLITS, 
-            "gap_rows": config.CV_GAP_ROWS
+        # 6. CALCULATE TRAIN METRICS
+        y_train_pred = model.predict(X_final_train)
+        train_metrics = {
+            "RMSE": float(np.sqrt(mean_squared_error(y_final_train, y_train_pred))),
+            "MAE": float(mean_absolute_error(y_final_train, y_train_pred)),
+            "R2": float(r2_score(y_final_train, y_train_pred))
         }
+        all_train_metrics[target_name] = train_metrics
+        print(f"   Train RMSE: {train_metrics['RMSE']:.4f}")
 
-        print(f"\n🏆 BEST XGBOOST RESULTS FOR {target_name}:") # ⬅️ Đổi tên
-        print(f"   Avg Val RMSE: {val_rmse:.4f} (across {config.CV_N_SPLITS} folds)")
-        # ⬅️ SỬA LỖI LOGGING: In ra số vòng lặp TÌM ĐƯỢC (không phải số 2000 cố định)
-        print(f"   Best n_estimators (avg): {avg_best_iter}")
-        print(f"   Best learning_rate: {best_params.get('learning_rate'):.6f}")
+        # 7. SAVE MODEL (separate name for each target)
+        # ⬅️ THAY ĐỔI 4: Dùng tên model LGBM
+        model_name = f"{target_name}_{config.MODEL_NAME_LIGHTGBM}" 
+        model_path = os.path.join(config.MODEL_DIR, model_name)
+        joblib.dump(model, model_path)
+        print(f"💾 Model saved to: {model_path}")
 
-    output = {
-        "best_params": all_best_params,
-        "best_scores": all_best_scores,
-        "details": all_best_details,
-        "config": {
-            "n_trials": config.OPTUNA_TRIALS,
-            "cv_strategy": "PurgedTimeSeriesSplit",
-            "n_splits": config.CV_N_SPLITS,
-            "gap_rows": config.CV_GAP_ROWS,
-            # ❗️ Nhớ đổi tên này trong config.py
-            "search_space": config.XGBOOST_PARAM_RANGES, # ⬅️ Đổi tên
-            "leakage_safe": True
-        }
-    }
+    # ⬅️ THAY ĐỔI 5: Dùng tên file metrics LGBM
+    metrics_path = os.path.join(config.OUTPUT_DIR, config.TRAIN_METRICS_NAME)
+    with open(metrics_path, "w") as f:
+        yaml.dump(all_train_metrics, f, sort_keys=False)
+    print(f"\n💾 All train metrics saved to: {metrics_path}")
     
-    # ⬅️ THAY ĐỔI 3: Tên file output
-    # ❗️ Nhớ thêm OPTUNA_RESULTS_XGBOOST_YAML vào config.py
-    output_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_XGBOOST_YAML)
-    with open(output_path, "w") as f:
-        yaml.dump(output, f, sort_keys=False, default_flow_style=False)
-    
-    print("\n" + "="*80)
-    print("✅ OPTUNA XGBOOST SEARCH COMPLETE (LEAKAGE-FREE)") # ⬅️ Đổi tên
-    print("="*80)
-    print(f"📁 Best params saved to: {output_path}")
-    print(f"\n📊 Summary of Best RMSE:")
-    for target, score in all_best_scores.items():
-        print(f"   {target}: {score:.4f}")
-    
-    # ⬅️ THAY ĐỔI 4: Bước tiếp theo
-    print(f"\n🚀 NEXT STEP: Run 'python train_xgboost.py' to train final models") # ⬅️ Đổi tên
-    print("="*80)
-    
+    print(f"\n🚀 NEXT STEP: Run 'python inference_lightgbm.py'") # ⬅️ Đổi tên
     task.close()
 
 if __name__ == "__main__":
-    run_optuna_search_xgboost() # ⬅️ Đổi tên hàm
+    main()
