@@ -1,9 +1,0 @@
-total_samples: 3934
-train_samples: 2753
-val_samples: 590
-test_samples: 591
-split_ratio:
-  train: 0.7
-  val: 0.15
-  test: 0.15000000000000005
-raw_file: c:\Users\Lenovo\OneDrive - National Economics University\Machine Learning\Final-ML\Final-ML\daily\raw_data\HCMWeatherDaily.xlsx
