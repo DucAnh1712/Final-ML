@@ -14,6 +14,7 @@ clearml
 streamlit
 matplotlib
 seaborn
+streamlit_autorefresh
 
 # Utilities
 pyyaml     # Dùng để đọc/ghi file .yaml (lưu metrics, params)

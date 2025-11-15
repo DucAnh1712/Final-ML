@@ -3,9 +3,9 @@ import os
 import joblib
 import pandas as pd
 import config
-import xgboost as xgb # Phải import
+import xgboost as xgb
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import RobustScaler # Đảm bảo import đúng Scaler
+from sklearn.preprocessing import RobustScaler
 
 # Import thư viện ONNX
 from skl2onnx import convert_sklearn
