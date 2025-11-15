@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import yaml
 import optuna
-import xgboost as xgb # ⬅️ THÊM IMPORT
+import xgboost as xgb # ⬅️ THAY ĐỔI
 from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import mean_squared_error
 from clearml import Task
@@ -12,21 +12,12 @@ import config
 from feature_engineering import create_feature_pipeline
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
-# -----------------------------------------------------------------
-# CÁC HÀM SAU GIỮ NGUYÊN TỪ FILE optuna_search_linear.py (V4)
-# 1. class PurgedTimeSeriesSplit
-# 2. def align_data_for_tuning
-# 3. def load_data_for_tuning
-# -----------------------------------------------------------------
-
-# (Copy y hệt 3 hàm/class đó vào đây)
-# ... (Giả sử bạn đã copy 3 hàm/class đó vào đây) ...
 
 # =============================================================================
 # CUSTOM PURGED TIME SERIES SPLIT (ANTI-LEAKAGE)
 # =============================================================================
 class PurgedTimeSeriesSplit:
-    # (Copy code của class PurgedTimeSeriesSplit vào đây)
+    # (Code của class PurgedTimeSeriesSplit giữ nguyên)
     def __init__(self, n_splits=5, gap=0):
         self.n_splits = n_splits
         self.gap = gap
@@ -50,6 +41,7 @@ class PurgedTimeSeriesSplit:
 # ALIGNMENT FUNCTION (SỬA LỖI DROPNA)
 # =============================================================================
 def align_data_for_tuning(X_raw, y_raw, pipeline, scaler, fit_transform=False):
+    # (Code hàm này giữ nguyên)
     if fit_transform:
         X_feat = pipeline.fit_transform(X_raw)
         X_scaled = scaler.fit_transform(X_feat)
@@ -70,6 +62,7 @@ def align_data_for_tuning(X_raw, y_raw, pipeline, scaler, fit_transform=False):
 # DATA LOADING (FIXED - THÊM BƯỚC DROPNA QUAN TRỌNG)
 # =============================================================================
 def load_data_for_tuning(target_name):
+    # (Code hàm này giữ nguyên)
     print(f"🔍 Loading RAW data (Train + Val COMBINED) for {target_name}...")
     train_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
     val_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv"))
@@ -98,10 +91,11 @@ def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
     """
     Objective function cho XGBoost (với Early Stopping)
     """
-    ranges = config.XGBOOST_PARAM_RANGES
+    # ❗️ Đảm bảo bạn đã định nghĩa 'XGBOOST_PARAM_RANGES' trong config.py
+    ranges = config.XGBOOST_PARAM_RANGES 
     
     # 1. Suggest hyperparameters
-    # ❗️ BỎ "n_estimators" khỏi đây
+    # ❗️ Bỏ "num_leaves" (của LGBM), thay bằng các param của XGBoost
     params = {
         'learning_rate': trial.suggest_float('learning_rate', *ranges['learning_rate'], log=True),
         'max_depth': trial.suggest_int('max_depth', *ranges['max_depth']),
@@ -109,12 +103,18 @@ def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
         'colsample_bytree': trial.suggest_float('colsample_bytree', *ranges['colsample_bytree']),
         'reg_alpha': trial.suggest_float('reg_alpha', *ranges['reg_alpha'], log=True),
         'reg_lambda': trial.suggest_float('reg_lambda', *ranges['reg_lambda'], log=True),
-        'num_leaves': trial.suggest_int('num_leaves', *ranges['num_leaves']),
-        'random_state': 42,
+        
+        # (Tùy chọn, thêm nếu bạn có 'min_child_weight' trong config)
+        # 'min_child_weight': trial.suggest_int('min_child_weight', *ranges['min_child_weight']),
+        
+        # --- Tham số cố định cho XGBoost ---
+        'objective': 'reg:squarederror',
+        'booster': 'gbtree',
+        'tree_method': 'hist', # Dùng 'hist' cho nhanh, hoặc 'gpu_hist' nếu có GPU
+        'seed': 42,
         'n_jobs': -1,
-        'verbose': -1,
-        # ✅ THÊM MỚI: Đặt n_estimators thành 1 số lớn cố định
-        'n_estimators': 2000 
+        'verbosity': 0, # Tắt log của XGBoost
+        'n_estimators': 2000 # ✅ Số lớn cố định cho early stopping
     }
 
     tscv = PurgedTimeSeriesSplit(
@@ -122,6 +122,7 @@ def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
         gap=config.CV_GAP_ROWS
     )
     fold_scores = []
+    best_iterations = [] # ⬅️ MỚI: Theo dõi số vòng lặp tốt nhất
     
     for fold_num, (train_idx, val_idx) in enumerate(tscv.split(X_all_train_raw)):
         X_train_fold_raw = X_all_train_raw.iloc[train_idx]
@@ -135,9 +136,9 @@ def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
             val_dates_col = X_val_fold_raw['datetime']
             gap_duration = (val_dates_col.min() - train_dates_col.max())
             print(f"   ✅ Fold 1 verified:")
-            print(f"      Train: {train_dates_col.min()} → {train_dates_col.max()}")
-            print(f"      Gap:   {gap_duration} (approx {config.CV_GAP_DAYS} days)")
-            print(f"      Val:   {val_dates_col.min()} → {val_dates_col.max()}")
+            print(f"       Train: {train_dates_col.min()} → {train_dates_col.max()}")
+            print(f"       Gap:   {gap_duration} (approx {config.CV_GAP_DAYS} days)")
+            print(f"       Val:   {val_dates_col.min()} → {val_dates_col.max()}")
 
         feature_pipeline_fold = create_feature_pipeline()
         scaler_fold = RobustScaler()
@@ -152,30 +153,40 @@ def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
             fit_transform=False
         )
 
+        # ⬅️ THAY ĐỔI: Khởi tạo XGBRegressor
         model = xgb.XGBRegressor(**params)
         
         if X_train_fold.empty or y_train_fold.empty:
             print(f"   ⚠️ Fold {fold_num+1} rỗng. Bỏ qua.")
             continue
 
-        # ✅ THÊM MỚI: Thêm eval_set và early_stopping callback
+        # ⬅️ THAY ĐỔI: Cú pháp .fit() của XGBoost cho early stopping
         model.fit(
             X_train_fold, y_train_fold,
-            eval_set=[(X_val_fold, y_val_fold)], # ⬅️ Cung cấp dữ liệu val
-            callbacks=[xgb.early_stopping(100, verbose=False)] # ⬅️ Ngắt sớm sau 100 vòng nếu không cải thiện
+            eval_set=[(X_val_fold, y_val_fold)],
+            early_stopping_rounds=100, # ⬅️ Tham số của XGBoost
+            verbose=False # ⬅️ Tắt log khi fit
         )
         
-        # Lấy điểm (score) tại vòng (iteration) tốt nhất
-        best_iteration = model.best_iteration_
-        if best_iteration is None or best_iteration == 0:
+        # ⬅️ THAY ĐỔI: Lấy số vòng lặp tốt nhất (không có dấu _ )
+        best_iteration = model.best_iteration
+        if best_iteration is None or best_iteration <= 0:
             best_iteration = params['n_estimators'] # Fallback
+        best_iterations.append(best_iteration)
             
-        y_val_pred = model.predict(X_val_fold, num_iteration=best_iteration)
+        # ⬅️ THAY ĐỔI: predict() của XGBoost tự động dùng best_iteration
+        # không cần tham số num_iteration
+        y_val_pred = model.predict(X_val_fold)
+        
         val_rmse = np.sqrt(mean_squared_error(y_val_fold, y_val_pred))
         fold_scores.append(val_rmse)
     
     final_rmse = np.mean(fold_scores)
+    avg_best_iteration = int(np.mean(best_iterations)) # ⬅️ MỚI: Tính số vòng lặp TB
+    
     trial.set_user_attr("val_rmse", float(final_rmse))
+    # ⬅️ MỚI: Lưu lại số vòng lặp TB để dùng khi train
+    trial.set_user_attr("avg_best_iteration", avg_best_iteration) 
     
     return final_rmse
 
@@ -183,12 +194,9 @@ def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
 # ⬅️ THAY ĐỔI 2: HÀM MAIN
 # =============================================================================
 def run_optuna_search_xgboost(): # ⬅️ Đổi tên hàm
-    """
-    Run Optuna search cho XGBoost
-    """
     task = Task.init(
         project_name=config.CLEARML_PROJECT_NAME,
-        task_name="Optuna XGBoost (Hourly)", # ⬅️ Đổi tên Task
+        task_name="Optuna XGBoost (Hourly)", # ⬅️ Đổi tên
         tags=["Optuna", "XGBoost", "Multi-Horizon", "Purged-CV", "Hourly"] # ⬅️ Đổi Tag
     )
     
@@ -203,10 +211,10 @@ def run_optuna_search_xgboost(): # ⬅️ Đổi tên hàm
     
         X_all_train_raw, y_all_train_raw = load_data_for_tuning(target_name)
         
-        print(f"🔍 Starting Optuna search (XGBoost)...")
+        print(f"🔍 Starting Optuna search (XGBoost)...") # ⬅️ Đổi tên
         print(f"   Strategy: {config.CV_N_SPLITS}-Fold Purged TimeSeriesSplit (Gap={config.CV_GAP_ROWS} rows/hours)")
         print(f"   Trials:   {config.OPTUNA_TRIALS}")
-        print(f"   ⚠️  This will take time...\n")
+        print(f"   ⚠️   This will take time...\n")
         
         study = optuna.create_study(direction="minimize")
         study.optimize(
@@ -218,23 +226,28 @@ def run_optuna_search_xgboost(): # ⬅️ Đổi tên hàm
         best_trial = study.best_trial
         best_params = best_trial.params
         val_rmse = best_trial.user_attrs.get("val_rmse", 0)
+        # ⬅️ MỚI: Lấy số vòng lặp tốt nhất từ trial
+        avg_best_iter = best_trial.user_attrs.get("avg_best_iteration", 0) 
+
+        # ⬅️ MỚI: GHI ĐÈ 'n_estimators' bằng số vòng lặp tìm được
+        # Đây là tham số quan trọng nhất để train model cuối cùng
+        best_params['n_estimators'] = avg_best_iter
 
         all_best_params[target_name] = best_params
         all_best_scores[target_name] = float(val_rmse)
         all_best_details[target_name] = {
-            "val_rmse": float(val_rmse),
-            "n_folds": config.CV_N_SPLITS,
-            "gap_rows": config.CV_GAP_ROWS # ⬅️ Sửa tên
+            "val_rmse": float(val_rmse), 
+            "avg_best_iteration": avg_best_iter, # ⬅️ MỚI: Lưu lại
+            "n_folds": config.CV_N_SPLITS, 
+            "gap_rows": config.CV_GAP_ROWS
         }
 
         print(f"\n🏆 BEST XGBOOST RESULTS FOR {target_name}:") # ⬅️ Đổi tên
         print(f"   Avg Val RMSE: {val_rmse:.4f} (across {config.CV_N_SPLITS} folds)")
-        # In ra các params quan trọng
-        print(f"   Best n_estimators: {best_params.get('n_estimators')}")
+        # ⬅️ SỬA LỖI LOGGING: In ra số vòng lặp TÌM ĐƯỢC (không phải số 2000 cố định)
+        print(f"   Best n_estimators (avg): {avg_best_iter}")
         print(f"   Best learning_rate: {best_params.get('learning_rate'):.6f}")
-        print(f"   Best max_depth: {best_params.get('max_depth')}")
 
-    # Save results to YAML
     output = {
         "best_params": all_best_params,
         "best_scores": all_best_scores,
@@ -243,19 +256,21 @@ def run_optuna_search_xgboost(): # ⬅️ Đổi tên hàm
             "n_trials": config.OPTUNA_TRIALS,
             "cv_strategy": "PurgedTimeSeriesSplit",
             "n_splits": config.CV_N_SPLITS,
-            "gap_rows": config.CV_GAP_ROWS, # ⬅️ Sửa tên
+            "gap_rows": config.CV_GAP_ROWS,
+            # ❗️ Nhớ đổi tên này trong config.py
             "search_space": config.XGBOOST_PARAM_RANGES, # ⬅️ Đổi tên
             "leakage_safe": True
         }
     }
     
     # ⬅️ THAY ĐỔI 3: Tên file output
+    # ❗️ Nhớ thêm OPTUNA_RESULTS_XGBOOST_YAML vào config.py
     output_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_XGBOOST_YAML)
     with open(output_path, "w") as f:
         yaml.dump(output, f, sort_keys=False, default_flow_style=False)
     
     print("\n" + "="*80)
-    print("✅ OPTUNA XGBOOST SEARCH COMPLETE (LEAKAGE-FREE)")
+    print("✅ OPTUNA XGBOOST SEARCH COMPLETE (LEAKAGE-FREE)") # ⬅️ Đổi tên
     print("="*80)
     print(f"📁 Best params saved to: {output_path}")
     print(f"\n📊 Summary of Best RMSE:")
@@ -263,11 +278,10 @@ def run_optuna_search_xgboost(): # ⬅️ Đổi tên hàm
         print(f"   {target}: {score:.4f}")
     
     # ⬅️ THAY ĐỔI 4: Bước tiếp theo
-    print(f"\n🚀 NEXT STEP: Run 'python train_xgboost.py' to train final models")
+    print(f"\n🚀 NEXT STEP: Run 'python train_xgboost.py' to train final models") # ⬅️ Đổi tên
     print("="*80)
     
     task.close()
-
 
 if __name__ == "__main__":
     run_optuna_search_xgboost() # ⬅️ Đổi tên hàm
