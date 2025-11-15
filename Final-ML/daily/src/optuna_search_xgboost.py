@@ -41,7 +41,6 @@ class PurgedTimeSeriesSplit:
         n_samples = len(X)
         indices = np.arange(n_samples)
         
-        # Tính kích thước mỗi fold
         test_size = n_samples // (self.n_splits + 1)
         
         for i in range(self.n_splits):
