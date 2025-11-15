@@ -87,12 +87,13 @@ def load_data_for_tuning(target_name):
 # =============================================================================
 def lightgbm_objective(trial, X_all_train_raw, y_all_train_raw):
     """
-    Objective function cho LightGBM
+    Objective function cho LightGBM (với Early Stopping)
     """
     ranges = config.LIGHTGBM_PARAM_RANGES
     
+    # 1. Suggest hyperparameters
+    # ❗️ BỎ "n_estimators" khỏi đây
     params = {
-        'n_estimators': trial.suggest_int('n_estimators', *ranges['n_estimators']),
         'learning_rate': trial.suggest_float('learning_rate', *ranges['learning_rate'], log=True),
         'max_depth': trial.suggest_int('max_depth', *ranges['max_depth']),
         'subsample': trial.suggest_float('subsample', *ranges['subsample']),
@@ -102,7 +103,9 @@ def lightgbm_objective(trial, X_all_train_raw, y_all_train_raw):
         'num_leaves': trial.suggest_int('num_leaves', *ranges['num_leaves']),
         'random_state': 42,
         'n_jobs': -1,
-        'verbose': -1 # Tắt bớt log
+        'verbose': -1,
+        # ✅ THÊM MỚI: Đặt n_estimators thành 1 số lớn cố định
+        'n_estimators': 2000 
     }
 
     tscv = PurgedTimeSeriesSplit(
@@ -117,6 +120,7 @@ def lightgbm_objective(trial, X_all_train_raw, y_all_train_raw):
         X_val_fold_raw = X_all_train_raw.iloc[val_idx]
         y_val_fold_raw = y_all_train_raw.iloc[val_idx]
         
+        # (Phần in log Fold 1 giữ nguyên)
         if fold_num == 0:
             train_dates_col = X_train_fold_raw['datetime'] 
             val_dates_col = X_val_fold_raw['datetime']
@@ -139,15 +143,25 @@ def lightgbm_objective(trial, X_all_train_raw, y_all_train_raw):
             fit_transform=False
         )
 
-        model = lgb.LGBMRegressor(**params) # ⬅️ Đổi model
+        model = lgb.LGBMRegressor(**params)
         
         if X_train_fold.empty or y_train_fold.empty:
             print(f"   ⚠️ Fold {fold_num+1} rỗng. Bỏ qua.")
             continue
 
-        model.fit(X_train_fold, y_train_fold)
+        # ✅ THÊM MỚI: Thêm eval_set và early_stopping callback
+        model.fit(
+            X_train_fold, y_train_fold,
+            eval_set=[(X_val_fold, y_val_fold)], # ⬅️ Cung cấp dữ liệu val
+            callbacks=[lgb.early_stopping(100, verbose=False)] # ⬅️ Ngắt sớm sau 100 vòng nếu không cải thiện
+        )
         
-        y_val_pred = model.predict(X_val_fold)
+        # Lấy điểm (score) tại vòng (iteration) tốt nhất
+        best_iteration = model.best_iteration_
+        if best_iteration is None or best_iteration == 0:
+            best_iteration = params['n_estimators'] # Fallback
+            
+        y_val_pred = model.predict(X_val_fold, num_iteration=best_iteration)
         val_rmse = np.sqrt(mean_squared_error(y_val_fold, y_val_pred))
         fold_scores.append(val_rmse)
     

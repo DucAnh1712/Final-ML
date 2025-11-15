@@ -70,7 +70,7 @@ TEST_PREDS_LIGHTGBM_NAME = "test_predictions_lightgbm_hourly.csv" # ⬅️ THÊM
 # OPTUNA FINE-TUNING
 # ======================================================
 # Giảm số trials vì dữ liệu hourly lớn hơn 24 lần
-OPTUNA_TRIALS = 100 
+OPTUNA_TRIALS = 50 
 
 # Search space cho Linear Models
 LINEAR_PARAM_RANGES = {
