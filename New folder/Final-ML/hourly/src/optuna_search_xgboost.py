@@ -104,17 +104,17 @@ def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
         'reg_alpha': trial.suggest_float('reg_alpha', *ranges['reg_alpha'], log=True),
         'reg_lambda': trial.suggest_float('reg_lambda', *ranges['reg_lambda'], log=True),
         
-        # (Tùy chọn, thêm nếu bạn có 'min_child_weight' trong config)
-        # 'min_child_weight': trial.suggest_int('min_child_weight', *ranges['min_child_weight']),
-        
         # --- Tham số cố định cho XGBoost ---
         'objective': 'reg:squarederror',
         'booster': 'gbtree',
-        'tree_method': 'hist', # Dùng 'hist' cho nhanh, hoặc 'gpu_hist' nếu có GPU
+        'tree_method': 'hist', 
         'seed': 42,
         'n_jobs': -1,
-        'verbosity': 0, # Tắt log của XGBoost
-        'n_estimators': 2000 # ✅ Số lớn cố định cho early stopping
+        'verbosity': 0,
+        'n_estimators': 2000,
+        
+        # ⬅️ THAY ĐỔI 1: Di chuyển early_stopping_rounds LÊN ĐÂY
+        'early_stopping_rounds': 100 
     }
 
     tscv = PurgedTimeSeriesSplit(
@@ -122,15 +122,15 @@ def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
         gap=config.CV_GAP_ROWS
     )
     fold_scores = []
-    best_iterations = [] # ⬅️ MỚI: Theo dõi số vòng lặp tốt nhất
+    best_iterations = []
     
     for fold_num, (train_idx, val_idx) in enumerate(tscv.split(X_all_train_raw)):
+        # (Phần xử lý data, pipeline, scaler giữ nguyên...)
         X_train_fold_raw = X_all_train_raw.iloc[train_idx]
         y_train_fold_raw = y_all_train_raw.iloc[train_idx]
         X_val_fold_raw = X_all_train_raw.iloc[val_idx]
         y_val_fold_raw = y_all_train_raw.iloc[val_idx]
         
-        # (Phần in log Fold 1 giữ nguyên)
         if fold_num == 0:
             train_dates_col = X_train_fold_raw['datetime'] 
             val_dates_col = X_val_fold_raw['datetime']
@@ -153,40 +153,41 @@ def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
             fit_transform=False
         )
 
-        # ⬅️ THAY ĐỔI: Khởi tạo XGBRegressor
-        model = xgb.XGBRegressor(**params)
+        model = xgb.XGBRegressor(**params) # ⬅️ params bây giờ đã chứa 'early_stopping_rounds'
         
         if X_train_fold.empty or y_train_fold.empty:
             print(f"   ⚠️ Fold {fold_num+1} rỗng. Bỏ qua.")
             continue
 
-        # ⬅️ THAY ĐỔI: Cú pháp .fit() của XGBoost cho early stopping
         model.fit(
             X_train_fold, y_train_fold,
             eval_set=[(X_val_fold, y_val_fold)],
-            early_stopping_rounds=100, # ⬅️ Tham số của XGBoost
-            verbose=False # ⬅️ Tắt log khi fit
+            # ⬅️ THAY ĐỔI 2: Xóa tham số 'early_stopping_rounds' khỏi đây
+            verbose=False
         )
         
-        # ⬅️ THAY ĐỔI: Lấy số vòng lặp tốt nhất (không có dấu _ )
+        # (Phần còn lại của hàm giữ nguyên)
         best_iteration = model.best_iteration
         if best_iteration is None or best_iteration <= 0:
-            best_iteration = params['n_estimators'] # Fallback
+            best_iteration = params['n_estimators'] 
         best_iterations.append(best_iteration)
             
-        # ⬅️ THAY ĐỔI: predict() của XGBoost tự động dùng best_iteration
-        # không cần tham số num_iteration
         y_val_pred = model.predict(X_val_fold)
         
         val_rmse = np.sqrt(mean_squared_error(y_val_fold, y_val_pred))
         fold_scores.append(val_rmse)
     
     final_rmse = np.mean(fold_scores)
-    avg_best_iteration = int(np.mean(best_iterations)) # ⬅️ MỚI: Tính số vòng lặp TB
+    avg_best_iteration = int(np.mean(best_iterations)) 
     
     trial.set_user_attr("val_rmse", float(final_rmse))
-    # ⬅️ MỚI: Lưu lại số vòng lặp TB để dùng khi train
     trial.set_user_attr("avg_best_iteration", avg_best_iteration) 
+    
+    # ❗️ QUAN TRỌNG: Loại bỏ 'early_stopping_rounds' khỏi kết quả
+    #    Nếu không, nó sẽ bị Optuna báo lỗi khi lưu vào trial.params
+    #    Chúng ta chỉ cần nó khi train, không cần nó trong bộ params
+    if 'early_stopping_rounds' in params:
+        del params['early_stopping_rounds']
     
     return final_rmse
 
@@ -224,13 +225,12 @@ def run_optuna_search_xgboost(): # ⬅️ Đổi tên hàm
         )
         
         best_trial = study.best_trial
-        best_params = best_trial.params
+        best_params = best_trial.params # Đây là dict các giá trị Optuna tìm được
+        
         val_rmse = best_trial.user_attrs.get("val_rmse", 0)
-        # ⬅️ MỚI: Lấy số vòng lặp tốt nhất từ trial
         avg_best_iter = best_trial.user_attrs.get("avg_best_iteration", 0) 
 
-        # ⬅️ MỚI: GHI ĐÈ 'n_estimators' bằng số vòng lặp tìm được
-        # Đây là tham số quan trọng nhất để train model cuối cùng
+        # GHI ĐÈ 'n_estimators' bằng số vòng lặp tìm được
         best_params['n_estimators'] = avg_best_iter
 
         all_best_params[target_name] = best_params
