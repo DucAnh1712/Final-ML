@@ -96,40 +96,40 @@ def load_data_for_tuning(target_name):
 # =============================================================================
 def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
     """
-    Objective function cho XGBoost
+    Objective function cho XGBoost (với Early Stopping)
     """
-    # Đọc search space của XGBoost từ config
     ranges = config.XGBOOST_PARAM_RANGES
     
     # 1. Suggest hyperparameters
+    # ❗️ BỎ "n_estimators" khỏi đây
     params = {
-        'n_estimators': trial.suggest_int('n_estimators', *ranges['n_estimators']),
         'learning_rate': trial.suggest_float('learning_rate', *ranges['learning_rate'], log=True),
         'max_depth': trial.suggest_int('max_depth', *ranges['max_depth']),
         'subsample': trial.suggest_float('subsample', *ranges['subsample']),
         'colsample_bytree': trial.suggest_float('colsample_bytree', *ranges['colsample_bytree']),
         'reg_alpha': trial.suggest_float('reg_alpha', *ranges['reg_alpha'], log=True),
         'reg_lambda': trial.suggest_float('reg_lambda', *ranges['reg_lambda'], log=True),
+        'num_leaves': trial.suggest_int('num_leaves', *ranges['num_leaves']),
         'random_state': 42,
-        'n_jobs': -1
+        'n_jobs': -1,
+        'verbose': -1,
+        # ✅ THÊM MỚI: Đặt n_estimators thành 1 số lớn cố định
+        'n_estimators': 2000 
     }
 
-    # 2. Purged Time Series CV (Dùng CV_GAP_ROWS)
     tscv = PurgedTimeSeriesSplit(
         n_splits=config.CV_N_SPLITS, 
-        gap=config.CV_GAP_ROWS # ⬅️ Đảm bảo dùng _ROWS
+        gap=config.CV_GAP_ROWS
     )
-    
     fold_scores = []
     
-    # 3. Loop through folds
     for fold_num, (train_idx, val_idx) in enumerate(tscv.split(X_all_train_raw)):
         X_train_fold_raw = X_all_train_raw.iloc[train_idx]
         y_train_fold_raw = y_all_train_raw.iloc[train_idx]
         X_val_fold_raw = X_all_train_raw.iloc[val_idx]
         y_val_fold_raw = y_all_train_raw.iloc[val_idx]
         
-        # Log first fold for verification
+        # (Phần in log Fold 1 giữ nguyên)
         if fold_num == 0:
             train_dates_col = X_train_fold_raw['datetime'] 
             val_dates_col = X_val_fold_raw['datetime']
@@ -139,39 +139,41 @@ def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
             print(f"      Gap:   {gap_duration} (approx {config.CV_GAP_DAYS} days)")
             print(f"      Val:   {val_dates_col.min()} → {val_dates_col.max()}")
 
-        # 4. Create NEW pipeline and scaler
         feature_pipeline_fold = create_feature_pipeline()
         scaler_fold = RobustScaler()
-
-        # 5. Fit/Transform on train fold
         X_train_fold, y_train_fold = align_data_for_tuning(
             X_train_fold_raw, y_train_fold_raw, 
             feature_pipeline_fold, scaler_fold, 
             fit_transform=True
         )
-        
-        # 6. Transform on val fold
         X_val_fold, y_val_fold = align_data_for_tuning(
             X_val_fold_raw, y_val_fold_raw, 
             feature_pipeline_fold, scaler_fold, 
             fit_transform=False
         )
 
-        # 7. Train model
         model = xgb.XGBRegressor(**params)
         
         if X_train_fold.empty or y_train_fold.empty:
-            print(f"   ⚠️ Fold {fold_num+1} rỗng sau khi align/dropna. Bỏ qua fold này.")
+            print(f"   ⚠️ Fold {fold_num+1} rỗng. Bỏ qua.")
             continue
 
-        model.fit(X_train_fold, y_train_fold)
+        # ✅ THÊM MỚI: Thêm eval_set và early_stopping callback
+        model.fit(
+            X_train_fold, y_train_fold,
+            eval_set=[(X_val_fold, y_val_fold)], # ⬅️ Cung cấp dữ liệu val
+            callbacks=[xgb.early_stopping(100, verbose=False)] # ⬅️ Ngắt sớm sau 100 vòng nếu không cải thiện
+        )
         
-        # 8. Evaluate
-        y_val_pred = model.predict(X_val_fold)
+        # Lấy điểm (score) tại vòng (iteration) tốt nhất
+        best_iteration = model.best_iteration_
+        if best_iteration is None or best_iteration == 0:
+            best_iteration = params['n_estimators'] # Fallback
+            
+        y_val_pred = model.predict(X_val_fold, num_iteration=best_iteration)
         val_rmse = np.sqrt(mean_squared_error(y_val_fold, y_val_pred))
         fold_scores.append(val_rmse)
     
-    # 9. Return average RMSE
     final_rmse = np.mean(fold_scores)
     trial.set_user_attr("val_rmse", float(final_rmse))
     

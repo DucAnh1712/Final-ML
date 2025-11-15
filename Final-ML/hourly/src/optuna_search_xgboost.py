@@ -178,6 +178,7 @@ def xgboost_objective(trial, X_all_train_raw, y_all_train_raw):
     trial.set_user_attr("val_rmse", float(final_rmse))
     
     return final_rmse
+
 # =============================================================================
 # ⬅️ THAY ĐỔI 2: HÀM MAIN
 # =============================================================================
