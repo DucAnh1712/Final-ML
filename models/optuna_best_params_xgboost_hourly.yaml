@@ -1,0 +1,125 @@
+best_params:
+  target_t24:
+    learning_rate: 0.0078113734557485265
+    max_depth: 6
+    subsample: 0.7906478625266519
+    colsample_bytree: 0.600877377638074
+    reg_alpha: 0.0020630502567873295
+    reg_lambda: 8.737852937734448
+    n_estimators: 659
+  target_t48:
+    learning_rate: 0.0037457560618564265
+    max_depth: 6
+    subsample: 0.6481735678800831
+    colsample_bytree: 0.6291658150420888
+    reg_alpha: 2.680787426793258
+    reg_lambda: 9.980487410341975e-05
+    n_estimators: 1045
+  target_t72:
+    learning_rate: 0.01772774432949117
+    max_depth: 5
+    subsample: 0.7438564985020221
+    colsample_bytree: 0.7142916704896592
+    reg_alpha: 0.005490150758544903
+    reg_lambda: 0.027759295175066836
+    n_estimators: 213
+  target_t96:
+    learning_rate: 0.0037997424298757214
+    max_depth: 5
+    subsample: 0.6798824302385793
+    colsample_bytree: 0.6339783085744605
+    reg_alpha: 4.014724208045578e-05
+    reg_lambda: 0.0006772953397862209
+    n_estimators: 956
+  target_t120:
+    learning_rate: 0.004797517862616629
+    max_depth: 5
+    subsample: 0.6869269022698934
+    colsample_bytree: 0.6002884631137549
+    reg_alpha: 0.04928207627535277
+    reg_lambda: 0.0074250505961105575
+    n_estimators: 747
+  target_t144:
+    learning_rate: 0.01360949145116742
+    max_depth: 5
+    subsample: 0.7117067898362298
+    colsample_bytree: 0.718607005109392
+    reg_alpha: 86.23313967566303
+    reg_lambda: 0.01810539662807807
+    n_estimators: 279
+  target_t168:
+    learning_rate: 0.004076110899134499
+    max_depth: 4
+    subsample: 0.6351111435818824
+    colsample_bytree: 0.7526226077436531
+    reg_alpha: 0.048446554765125695
+    reg_lambda: 1.7486374312057182
+    n_estimators: 888
+best_scores:
+  target_t24: 1.4541152812083444
+  target_t48: 1.5426226203078772
+  target_t72: 1.5754022211603176
+  target_t96: 1.5880268600973124
+  target_t120: 1.6000078372855961
+  target_t144: 1.6056633451588498
+  target_t168: 1.6093826989044566
+details:
+  target_t24:
+    val_rmse: 1.4541152812083444
+    avg_best_iteration: 659
+    n_folds: 5
+    gap_rows: 168
+  target_t48:
+    val_rmse: 1.5426226203078772
+    avg_best_iteration: 1045
+    n_folds: 5
+    gap_rows: 168
+  target_t72:
+    val_rmse: 1.5754022211603176
+    avg_best_iteration: 213
+    n_folds: 5
+    gap_rows: 168
+  target_t96:
+    val_rmse: 1.5880268600973124
+    avg_best_iteration: 956
+    n_folds: 5
+    gap_rows: 168
+  target_t120:
+    val_rmse: 1.6000078372855961
+    avg_best_iteration: 747
+    n_folds: 5
+    gap_rows: 168
+  target_t144:
+    val_rmse: 1.6056633451588498
+    avg_best_iteration: 279
+    n_folds: 5
+    gap_rows: 168
+  target_t168:
+    val_rmse: 1.6093826989044566
+    avg_best_iteration: 888
+    n_folds: 5
+    gap_rows: 168
+config:
+  n_trials: 50
+  cv_strategy: PurgedTimeSeriesSplit
+  n_splits: 5
+  gap_rows: 168
+  search_space:
+    n_estimators: !!python/tuple
+    - 200
+    - 2000
+    learning_rate: !!python/tuple
+    - 0.001
+    - 0.1
+    max_depth: !!python/tuple
+    - 3
+    - 10
+    subsample: &id001 !!python/tuple
+    - 0.6
+    - 1.0
+    colsample_bytree: *id001
+    reg_alpha: &id002 !!python/tuple
+    - 1.0e-05
+    - 100.0
+    reg_lambda: *id002
+  leakage_safe: true

@@ -1,0 +1,78 @@
+best_params:
+  target_t24:
+    model_type: ElasticNet
+    alpha: 0.000961736553651713
+    l1_ratio: 0.8937965301534804
+  target_t48:
+    model_type: Lasso
+    alpha: 0.00048400484109086255
+  target_t72:
+    model_type: Lasso
+    alpha: 0.000233588555699837
+  target_t96:
+    model_type: Ridge
+    alpha: 56.57571167365078
+  target_t120:
+    model_type: Ridge
+    alpha: 47.508857520169386
+  target_t144:
+    model_type: Lasso
+    alpha: 0.0008101194638729233
+  target_t168:
+    model_type: Lasso
+    alpha: 0.0014391294506110668
+best_scores:
+  target_t24: 1.5051828934348137
+  target_t48: 1.6046913872402468
+  target_t72: 1.639278271985512
+  target_t96: 1.6554017492923485
+  target_t120: 1.6730641374473147
+  target_t144: 1.689377878137586
+  target_t168: 1.6966045389360487
+details:
+  target_t24:
+    val_rmse: 1.5051828934348137
+    n_folds: 5
+    gap_days: 7
+  target_t48:
+    val_rmse: 1.6046913872402468
+    n_folds: 5
+    gap_days: 7
+  target_t72:
+    val_rmse: 1.639278271985512
+    n_folds: 5
+    gap_days: 7
+  target_t96:
+    val_rmse: 1.6554017492923485
+    n_folds: 5
+    gap_days: 7
+  target_t120:
+    val_rmse: 1.6730641374473147
+    n_folds: 5
+    gap_days: 7
+  target_t144:
+    val_rmse: 1.689377878137586
+    n_folds: 5
+    gap_days: 7
+  target_t168:
+    val_rmse: 1.6966045389360487
+    n_folds: 5
+    gap_days: 7
+config:
+  n_trials: 50
+  cv_strategy: PurgedTimeSeriesSplit
+  n_splits: 5
+  gap_days: 7
+  search_space:
+    model_type:
+    - LinearRegression
+    - Ridge
+    - Lasso
+    - ElasticNet
+    alpha: !!python/tuple
+    - 1.0e-05
+    - 100.0
+    l1_ratio: !!python/tuple
+    - 0.1
+    - 0.9
+  leakage_safe: true
