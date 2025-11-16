@@ -67,9 +67,9 @@ def main():
     print(f"  Test:  {test_df.index.min()} → {test_df.index.max()}")
 
     # 6. Save 3 CSV files (with datetime index)
-    train_path = os.path.join(config.PROCESSED_DATA_DIR, "data_train_to_pred.csv")
-    val_path = os.path.join(config.PROCESSED_DATA_DIR, "data_val_to_pred.csv")
-    test_path = os.path.join(config.PROCESSED_DATA_DIR, "data_test_to_pred.csv")
+    train_path = os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv")
+    val_path = os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv")
+    test_path = os.path.join(config.PROCESSED_DATA_DIR, "data_test.csv")
 
     # ✅✅✅ SỬA LỖI: Giờ đây index=True sẽ lưu DatetimeIndex
     # Cột đầu tiên trong file CSV sẽ là 'datetime'
