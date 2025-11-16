@@ -1,4 +1,4 @@
-# benchmark.py (V3 - Adding Ridge & DecisionTree)
+# benchmark.py
 import os
 import pandas as pd
 import numpy as np

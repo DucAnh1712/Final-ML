@@ -11,6 +11,8 @@ from sklearn.model_selection import TimeSeriesSplit
 from clearml import Task
 import config
 from feature_engineering import create_feature_pipeline
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 # =============================================================================

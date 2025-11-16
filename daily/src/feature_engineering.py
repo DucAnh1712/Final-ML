@@ -1,192 +1,153 @@
-# feature_engineering.py
-import os
-import pandas as pd
+# feature_engineering.py (PHIÊN BẢN V4 - LEAKAGE-FREE)
 import numpy as np
+import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
-import config
 
-# ======================================================
-# 1. CUSTOM TRANSFORMER CLASSES (Step 4)
-# ======================================================
-class FFillImputer(BaseEstimator, TransformerMixin):
+class TimeFeatureTransformer(BaseEstimator, TransformerMixin):
     """
-    Apply .fillna(method='ffill') and .fillna(method='bfill')
-    ONLY to numeric columns.
-    This respects time-series order and is safe from data leakage.
+    Tạo cyclical time features (sin/cos encoding)
+    ✅ SAFE: Không sử dụng thông tin từ future
     """
     def __init__(self):
-        self.num_cols = []
-
-    def fit(self, X, y=None):
-        # 1. FIT: Chỉ cần tìm ra cột nào là cột số
-        self.num_cols = X.select_dtypes(include=[np.number]).columns
-        return self
+        pass
     
-    def transform(self, X):
-        # 2. TRANSFORM: Áp dụng fill
-        df = X.copy()
-        if not self.num_cols.empty:
-            # Dùng ffill để điền NaNs bằng giá trị quá khứ
-            df[self.num_cols] = df[self.num_cols].ffill().bfill()
-        return df
-    
-class TimeFeatures(BaseEstimator, TransformerMixin):
-    """Create time-based features (seasonal, cyclical)."""
     def fit(self, X, y=None):
         return self
     
     def transform(self, X):
         df = X.copy()
-        df["datetime"] = pd.to_datetime(df["datetime"])
-        df["month"] = df["datetime"].dt.month
-        df["dayofyear"] = df["datetime"].dt.dayofyear
-        df["weekofyear"] = df["datetime"].dt.isocalendar().week
-        df["dayofweek"] = df["datetime"].dt.dayofweek
         
-        # Cyclical features
-        df["sin_dayofyear"] = np.sin(2 * np.pi * df["dayofyear"] / 365.25)
-        df["cos_dayofyear"] = np.cos(2 * np.pi * df["dayofyear"] / 365.25)
-        df["sin_week"] = np.sin(2 * np.pi * df["weekofyear"] / 52)
-        df["cos_week"] = np.cos(2 * np.pi * df["weekofyear"] / 52)
-        return df
-
-class LagRollingFeatures(BaseEstimator, TransformerMixin):
-    """Create lag and rolling statistics features."""
-    def __init__(self, lag_cols, lags, windows):
-        self.lag_cols = lag_cols
-        self.lags = lags
-        self.windows = windows
+        # Ensure datetime index
+        if not pd.api.types.is_datetime64_any_dtype(df.index):
+            if 'datetime' not in df.columns:
+                df = df.reset_index()
+            df['datetime'] = pd.to_datetime(df['datetime'])
+            df = df.set_index('datetime', drop=False)
         
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X):
-        df = X.copy()
-        # Important: must sort by datetime to calculate lags/rolling correctly
-        df = df.sort_values("datetime").reset_index(drop=True) 
+        # Cyclical encoding
+        df['month'] = df.index.month
+        df['day_of_year'] = df.index.dayofyear
+        df['day_of_week'] = df.index.dayofweek
         
-        for col in self.lag_cols:
-            if col in df.columns:
-                for lag in self.lags:
-                    df[f"{col}_lag{lag}"] = df[col].shift(lag)
-                for win in self.windows:
-                    # Use shift(1) to ensure only past data is used (no data leakage)
-                    rolling_series = df[col].shift(1).rolling(win, min_periods=1)
-                    df[f"{col}_rollmean{win}"] = rolling_series.mean()
-                    df[f"{col}_rollstd{win}"] = rolling_series.std()
-        return df
-
-class TextFeatureTransformer(BaseEstimator, TransformerMixin):
-    """Handle text columns (if any) - e.g., conditions."""
-    def fit(self, X, y=None):
-        return self
+        df['month_sin'] = np.sin(2 * np.pi * df['month'] / 12)
+        df['month_cos'] = np.cos(2 * np.pi * df['month'] / 12)
+        df['day_sin'] = np.sin(2 * np.pi * df['day_of_year'] / 365)
+        df['day_cos'] = np.cos(2 * np.pi * df['day_of_year'] / 365)
         
-    def transform(self, X):
-        df = X.copy()
-        if "conditions" in df.columns:
-            df["conditions"] = df["conditions"].astype(str).str.lower()
-            df["is_rain"] = df["conditions"].str.contains("rain", na=False).astype(int)
-            df["is_cloudy"] = df["conditions"].str.contains("cloud", na=False).astype(int)
-            df["is_clear"] = df["conditions"].str.contains("clear", na=False).astype(int)
-        return df
+        return df.drop(columns=['month', 'day_of_year', 'day_of_week'])
 
-class DropTextCols(BaseEstimator, TransformerMixin):
-    """Drop text/unnecessary columns."""
+
+class DerivedFeatureTransformer(BaseEstimator, TransformerMixin):
+    """
+    Tạo derived features từ raw features
+    ✅ SAFE: Chỉ sử dụng thông tin trong cùng row
+    """
+    def __init__(self):
+        pass
+    
     def fit(self, X, y=None):
         return self
     
     def transform(self, X):
         df = X.copy()
-        # Add 'datetime' to this list
-        drop_cols = ["conditions", "preciptype", "sunrise", "sunset", "datetime"]
-        df.drop(columns=[c for c in drop_cols if c in df.columns], inplace=True, errors="ignore")
+        
+        # Daylight hours calculation
+        if 'sunrise' in df.columns and 'sunset' in df.columns:
+            sr = pd.to_datetime(df['sunrise'], errors='coerce')
+            ss = pd.to_datetime(df['sunset'], errors='coerce')
+            valid_times = sr.notna() & ss.notna()
+            df['daylight_hours'] = np.nan
+            df.loc[valid_times, 'daylight_hours'] = (
+                (ss[valid_times] - sr[valid_times]).dt.total_seconds() / 3600
+            )
+            
+            # Solar energy per hour
+            if 'solarenergy' in df.columns:
+                df['solar_per_hour'] = df['solarenergy'] / (df['daylight_hours'] + 1e-6)
+        
+        # Temperature range
+        if 'tempmax' in df.columns and 'tempmin' in df.columns:
+            df['temp_range'] = df['tempmax'] - df['tempmin']
+        
+        # Dewpoint depression
+        if 'temp' in df.columns and 'dew' in df.columns:
+            df['dewpoint_depression'] = df['temp'] - df['dew']
+        
+        # ✅ Pressure change - SAFE within fold (gap ensures no leak)
+        if 'sealevelpressure' in df.columns:
+            pressure_change = df['sealevelpressure'].diff()
+            df['sealevelpressure_change'] = pressure_change.fillna(0)
+        
         return df
+
+
+class ColumnPreprocessor(BaseEstimator, TransformerMixin):
+    """
+    Select và preprocess final columns
+    ✅ SAFE: Forward-fill chỉ trong fold (protected by gap)
+    """
+    def __init__(self):
+        # Core weather features (quan trọng cho HCM)
+        self.feature_cols = [
+            'humidity', 'sealevelpressure', 'dew', 'cloudcover', 
+            'solarradiation', 'visibility', 'windspeed', 'windgust', 'precip',
+            'temp'  # Sẽ bị remove sau (tránh target leakage)
+        ]
+        
+        # Derived features
+        self.derived_cols = [
+            'month_sin', 'month_cos', 'day_sin', 'day_cos',
+            'daylight_hours', 'solar_per_hour', 'temp_range',
+            'dewpoint_depression', 'sealevelpressure_change'
+        ]
+        
+        self.final_cols = []
     
-# ======================================================
-# 2. FEATURE PIPELINE CREATION FUNCTION
-# ======================================================
+    def fit(self, X, y=None):
+        """Determine which columns are available"""
+        all_cols_available = list(X.columns)
+        existing_features = [col for col in self.feature_cols if col in all_cols_available]
+        existing_derived = [col for col in self.derived_cols if col in all_cols_available]
+        
+        self.final_cols = existing_features + existing_derived
+        
+        # ✅ Remove 'temp' to avoid target leakage
+        if 'temp' in self.final_cols:
+            self.final_cols.remove('temp')
+        
+        return self
+    
+    def transform(self, X):
+        """Select columns and handle missing values"""
+        df = X[self.final_cols].copy()
+        
+        # ✅ SAFE IMPUTATION STRATEGY:
+        # Forward-fill là OK vì:
+        # 1. Gap trong CV đảm bảo không leak giữa train/val
+        # 2. Phản ánh thực tế: Sensors thường giữ giá trị cuối nếu bị lỗi
+        df = df.ffill().bfill().fillna(0)
+        
+        return df
+
 
 def create_feature_pipeline():
-    """Create Scikit-learn Pipeline for feature engineering."""
+    """
+    Tạo pipeline feature engineering hoàn chỉnh
+    
+    Pipeline steps:
+    1. TimeFeatureTransformer - Tạo cyclical time features
+    2. DerivedFeatureTransformer - Tạo derived features
+    3. ColumnPreprocessor - Select columns và impute missing values
+    
+    Returns:
+    --------
+    sklearn.pipeline.Pipeline
+    """
     feature_pipeline = Pipeline([
-        ('imputer', FFillImputer()),
-        ('time', TimeFeatures()),
-        ('weather_text', TextFeatureTransformer()),
-        ('lags', LagRollingFeatures(
-            lag_cols=config.LAG_COLS, 
-            lags=config.LAGS, 
-            windows=config.WINDOWS
-        )),
-        ('drop_text', DropTextCols())
+        ('add_time_features', TimeFeatureTransformer()),
+        ('add_derived_features', DerivedFeatureTransformer()),
+        ('preprocess_columns', ColumnPreprocessor())
     ])
+    
     return feature_pipeline
-
-# ======================================================
-# 3. MAIN PROCESS (FIXED DATA LEAKAGE)
-# ======================================================
-
-def main():
-    """
-    Main process: Load processed data -> Concat -> Create features -> Split -> Save.
-    This is the standard way to avoid data leakage at the train/val/test boundaries.
-    """
-    print("🚀 Starting Feature Engineering process...")
-    
-    # 1. Load processed data
-    train_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
-    val_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv"))
-    test_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_test.csv"))
-    
-    # Store lengths to split later
-    train_len = len(train_df)
-    val_len = len(val_df)
-
-    # 2. Concatenate
-    # Concat train, val, and test to transform together.
-    # This ensures lags for val are calculated from train, and lags for test from val.
-    df_full = pd.concat([train_df, val_df, test_df], ignore_index=True)
-    df_full["datetime"] = pd.to_datetime(df_full["datetime"])
-    df_full = df_full.sort_values("datetime").reset_index(drop=True)
-
-    # 3. Create pipeline and transform
-    feature_pipeline = create_feature_pipeline()
-    
-    print("⚙️ Applying feature engineering pipeline to full dataset...")
-    # Fit on train data only
-    feature_pipeline.fit(train_df)
-    # Transform the entire dataset
-    df_full_feat = feature_pipeline.transform(df_full)
-    
-    # 4. Split again
-    train_feat = df_full_feat.iloc[:train_len]
-    val_feat = df_full_feat.iloc[train_len : train_len + val_len]
-    test_feat = df_full_feat.iloc[train_len + val_len :]
-
-    # 5. Handle NaNs
-    # Only drop NaNs (from lag/rolling) on the train set
-    # val and test will not have NaNs at the start (as they use lags from train/val)
-    train_feat = train_feat.dropna().reset_index(drop=True)
-    val_feat = val_feat.reset_index(drop=True)
-    test_feat = test_feat.reset_index(drop=True)
-
-    print(f"📊 Shape after feature creation: Train={train_feat.shape}, Val={val_feat.shape}, Test={test_feat.shape}")
-
-    # 6. Save results
-    train_path = os.path.join(config.FEATURE_DIR, "feature_train.csv")
-    val_path = os.path.join(config.FEATURE_DIR, "feature_val.csv")
-    test_path = os.path.join(config.FEATURE_DIR, "feature_test.csv")
-
-    train_feat.to_csv(train_path, index=False)
-    val_feat.to_csv(val_path, index=False)
-    test_feat.to_csv(test_path, index=False)
-    
-    print(f"""
-✅ Feature data saved:
-  ┣━ Train: {train_path}
-  ┣━ Val:   {val_path}
-  ┗━ Test:  {test_path}
-""")
-
-if __name__ == "__main__":
-    main()

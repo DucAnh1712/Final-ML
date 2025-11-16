@@ -1,166 +1,162 @@
-# train.py
+# train_linear.py
 import os
 import pandas as pd
 import numpy as np
 import joblib
 import yaml
-import optuna
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.preprocessing import StandardScaler, RobustScaler
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import mean_squared_error
-from xgboost import XGBRegressor
-from clearml import Task
-
-# Import from other files
+from sklearn.preprocessing import RobustScaler
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from clearml import Task 
 import config
 from feature_engineering import create_feature_pipeline
 
-def load_features_for_tuning(target_col):
-    """Load created features for Optuna tuning."""
-    print("🔍 Loading feature data for tuning...")
-    train = pd.read_csv(os.path.join(config.FEATURE_DIR, "feature_train.csv"))
-    val = pd.read_csv(os.path.join(config.FEATURE_DIR, "feature_val.csv"))
+def load_optuna_best_params():
+    params_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_YAML)
+    if not os.path.exists(params_path):
+        raise FileNotFoundError(
+            f"❌ {params_path} not found\n"
+            f"Please run 'python {config.OPTUNA_SCRIPT_NAME}' first!"
+        )
+    with open(params_path, 'r') as f:
+        data = yaml.load(f, Loader=yaml.FullLoader)
+    print(f"✅ Loaded Optuna best params from: {params_path}")
+    return data['best_params']
 
-    # Concat train and val for Optuna's TimeSeriesSplit
-    full_train_df = pd.concat([train, val], ignore_index=True)
-    
-    # Drop non-feature columns
-    drop_cols = [target_col, 'datetime']
-    features_df = full_train_df.drop(columns=drop_cols, errors='ignore')
-    target_s = full_train_df[target_col]
+def align_data_final(X_feat_scaled_df, y_raw_series):
+    """
+    Simple align function: Just join and dropna
+    """
+    y_aligned = y_raw_series.copy()
+    y_aligned.index = X_feat_scaled_df.index 
+    y_df = pd.DataFrame(y_aligned)
+    combined = pd.concat([y_df, X_feat_scaled_df], axis=1)
+    combined_clean = combined.dropna()
+    y_final = combined_clean[y_aligned.name]
+    X_final = combined_clean.drop(columns=[y_aligned.name])
+    return X_final, y_final
 
-    # Drop remaining object columns
-    obj_cols = features_df.select_dtypes(include=['object']).columns
-    if not obj_cols.empty:
-        print(f"⚠️ Dropping object columns: {list(obj_cols)}")
-        features_df = features_df.drop(columns=obj_cols)
+def create_model_from_params(params):
+    model_type = params.get('model_type', 'LinearRegression')
+    alpha = params.get('alpha', 1.0)
+    l1_ratio = params.get('l1_ratio', 0.5)
 
-    return features_df, target_s
-
-def xgb_objective(trial, X, y):
-    """Objective function for Optuna (Step 5)."""
-    tscv = TimeSeriesSplit(n_splits=config.CV_SPLITS)
-    rmse_scores = []
-
-    # Define hyperparameters to tune
-    params = {
-        'n_estimators': trial.suggest_int("n_estimators", 100, 1000),
-        'max_depth': trial.suggest_int("max_depth", 3, 10),
-        'learning_rate': trial.suggest_float("learning_rate", 0.01, 0.3),
-        'subsample': trial.suggest_float("subsample", 0.6, 1.0),
-        'colsample_bytree': trial.suggest_float("colsample_bytree", 0.6, 1.0),
-        'gamma': trial.suggest_float("gamma", 0.0, 5.0),
-        'min_child_weight': trial.suggest_int("min_child_weight", 1, 10),
-        'random_state': 42,
-        'n_jobs': -1
-    }
-
-    for train_idx, val_idx in tscv.split(X):
-        X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
-        y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
-
-        # This pipeline only includes Scaler and Model
-        pipe = Pipeline([
-            ("scaler", RobustScaler()),
-            ("xgb", XGBRegressor(**params))
-        ])
-
-        pipe.fit(X_train, y_train)
-        preds = pipe.predict(X_val)
-        rmse_scores.append(np.sqrt(mean_squared_error(y_val, preds)))
-
-    return np.mean(rmse_scores)
+    if model_type == 'Ridge':
+        print(f"   Model: Ridge (alpha={alpha:.4f})")
+        return Ridge(alpha=alpha, random_state=42)
+    elif model_type == 'Lasso':
+        print(f"   Model: Lasso (alpha={alpha:.4f})")
+        return Lasso(alpha=alpha, random_state=42, max_iter=2000)
+    elif model_type == 'ElasticNet':
+        print(f"   Model: ElasticNet (alpha={alpha:.4f}, l1_ratio={l1_ratio:.4f})")
+        return ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=42, max_iter=2000)
+    else:
+        print("   Model: LinearRegression (Default)")
+        return LinearRegression(n_jobs=-1)
 
 def main():
-    """Main pipeline: Tune -> Create Final Pipeline -> Retrain -> Save."""
-    
-    # 1. Initialize ClearML (Step 5)
     task = Task.init(
         project_name=config.CLEARML_PROJECT_NAME,
-        task_name=config.CLEARML_TASK_NAME,
-        tags=["Optuna", "XGBoost", "Daily"]
+        task_name=config.CLEARML_TASK_NAME + " (Production)",
+        tags=["Production", "LinearTuned", "Multi-Horizon"]
     )
     
-    # 2. Load data (for tuning only)
-    X_tune, y_tune = load_features_for_tuning(target_col=config.TARGET_COL)
+    try:
+        all_best_params = load_optuna_best_params()
+    except FileNotFoundError as e:
+        print(str(e))
+        return
 
-    # 3. Run Optuna
-    print(f"🚀 Starting Optuna tuning ({config.OPTUNA_TRIALS} trials)...")
-    study = optuna.create_study(direction="minimize")
-    study.optimize(lambda trial: xgb_objective(trial, X_tune, y_tune), n_trials=config.OPTUNA_TRIALS)
-    
-    best_params = study.best_params
-    print(f"🏆 Best Params found: {best_params}")
-    
-    # Log best params to ClearML
-    task.connect(best_params, name='Best Hyperparameters')
-    task.get_logger().report_scalar("best_rmse", "RMSE", value=study.best_value, iteration=0)
+    print(f"🚀 STARTING PRODUCTION TRAINING (Tuned Linear, Multi-Horizon)")
+    print("="*70)
 
-    # 4. CREATE FINAL PRODUCTION PIPELINE
-    print("🛠️ Creating final production pipeline...")
-    production_pipeline = Pipeline([
-        ('feature_engineering', create_feature_pipeline()),
-        ('scaler', RobustScaler()),
-        ('model', XGBRegressor(**best_params, random_state=42, n_jobs=-1))
-    ])
-
-    # 5. RETRAIN ON FULL (TRAIN + VAL) DATASET
-    print("🔄 Retraining pipeline on (Train + Val)...")
+    # ======================================================
+    # 1. LOAD DATA (Merge Train + Val)
+    # ======================================================
+    print(f"📂 Loading data (Train+Val)...")
     train_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
     val_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv"))
-    
     all_train_data = pd.concat([train_df, val_df], ignore_index=True)
-    all_train_data["datetime"] = pd.to_datetime(all_train_data["datetime"])
-    all_train_data = all_train_data.sort_values("datetime").reset_index(drop=True)
+    all_train_data['datetime'] = pd.to_datetime(all_train_data['datetime'])
+    all_train_data = all_train_data.set_index('datetime', drop=False)
+    X_train_full = all_train_data.copy()
 
-    X_train_full = all_train_data.drop(columns=[config.TARGET_COL], errors='ignore')
-    y_train_full = all_train_data[config.TARGET_COL]
-
-    # Fit the complete pipeline
-    production_pipeline.fit(X_train_full, y_train_full)
-
-    # 6. SAVE PIPELINE
-    model_path = os.path.join(config.MODEL_DIR, config.MODEL_NAME)
-    joblib.dump(production_pipeline, model_path)
-    print(f"✅ Production pipeline saved to: {model_path}")
-    
     # ======================================================
-    # 7. SAVE TO ONNX FORMAT (STEP 9) - ĐÃ SỬA LẠI
+    # 2. FIT PIPELINE & SCALER (ONCE)
     # ======================================================
-    print("🛠️ Creating ONNX-convertible components (Scaler + Model)...")
+    feature_pipeline = create_feature_pipeline()
+    scaler = RobustScaler()
 
-    # 1. Tạo và huấn luyện Scaler
-    scaler = RobustScaler() 
-    X_train_full_feat, y_train_full_feat = load_features_for_tuning(config.TARGET_COL)
-    scaler.fit(X_train_full_feat)
+    print("Fitting Feature Pipeline on 85% data...")
+    X_feat_full = feature_pipeline.fit_transform(X_train_full)
     
-    # 2. Áp dụng Scaler
-    X_train_scaled = scaler.transform(X_train_full_feat)
-
-    # 3. Tạo và huấn luyện Model
-    model_xgb = XGBRegressor(**best_params, random_state=42, n_jobs=-1)
-    model_xgb.fit(X_train_scaled, y_train_full_feat)
-
-    # 4. LƯU 2 FILE RIÊNG BIỆT
-    # 4a. Lưu Scaler bằng joblib
-    scaler_path = os.path.join(config.MODEL_DIR, "scaler_for_onnx.pkl")
-    joblib.dump(scaler, scaler_path)
-    print(f"✅ ONNX Scaler saved to: {scaler_path}")
+    print("Fitting Scaler on 85% data...")
+    X_feat_full_clean = X_feat_full.dropna() 
+    scaler.fit(X_feat_full_clean)
     
-    # 4b. Lưu XGBoost bằng .save_model (JSON) để tránh lỗi pickle
-    model_json_path = os.path.join(config.MODEL_DIR, "model_for_onnx.json")
-    model_xgb.save_model(model_json_path)
-    print(f"✅ ONNX XGBoost Model saved to: {model_json_path}")
+    joblib.dump(feature_pipeline, os.path.join(config.MODEL_DIR, config.PIPELINE_NAME))
+    joblib.dump(scaler, os.path.join(config.MODEL_DIR, config.SCALER_NAME))
+    print(f"💾 Feature Pipeline saved to: {config.PIPELINE_NAME}")
+    print(f"💾 Scaler saved to: {config.SCALER_NAME}")
+
     # ======================================================
+    # 3. LOOP AND TRAIN EACH MODEL
+    # ======================================================
+    all_train_metrics = {}
+    X_scaled_full = scaler.transform(X_feat_full)
+    X_scaled_full_df = pd.DataFrame(X_scaled_full, index=X_feat_full.index, columns=X_feat_full.columns)
 
-    # Save best_params.yaml
-    params_path = os.path.join(config.MODEL_DIR, "best_params.yaml")
-    with open(params_path, "w") as f:
-        yaml.dump(best_params, f)
+    # ✅ IMPORTANT LOOP
+    for target_name in config.TARGET_FORECAST_COLS: # Will loop 7 times
+        print("\n" + "="*30)
+        print(f"🎯 Training for: {target_name}")
+        print("="*30)
+        
+        y_train_full = all_train_data[target_name]
+
+        # 4. Align data
+        X_final_train, y_final_train = align_data_final(
+            X_scaled_full_df, y_train_full
+        )
+        print(f"📊 Final training data (aligned): X={X_final_train.shape}, y={y_final_train.shape}")
+        
+        # 5. FIT MODEL (FROM TUNE RESULTS)
+        if target_name not in all_best_params:
+            print(f"⚠️ Tuned params not found for {target_name}. Using default LinearRegression.")
+            model = LinearRegression(n_jobs=-1)
+        else:
+            best_params = all_best_params[target_name]
+            task.connect(best_params, name=f'Best Params ({target_name})')
+            model = create_model_from_params(best_params)
+        
+        print(f"⏳ Training final {target_name} model...")
+        model.fit(X_final_train, y_final_train)
+        print(f"✅ Training complete!")
+
+        # 6. CALCULATE TRAIN METRICS
+        y_train_pred = model.predict(X_final_train)
+        train_metrics = {
+            "RMSE": float(np.sqrt(mean_squared_error(y_final_train, y_train_pred))),
+            "MAE": float(mean_absolute_error(y_final_train, y_train_pred)),
+            "R2": float(r2_score(y_final_train, y_train_pred))
+        }
+        all_train_metrics[target_name] = train_metrics
+        print(f"   Train RMSE: {train_metrics['RMSE']:.4f}")
+
+        # 7. SAVE MODEL (separate name for each target)
+        model_name = f"{target_name}_{config.MODEL_NAME}"
+        model_path = os.path.join(config.MODEL_DIR, model_name)
+        joblib.dump(model, model_path)
+        print(f"💾 Model saved to: {model_path}")
+
+    # Save all train metrics
+    metrics_path = os.path.join(config.OUTPUT_DIR, config.TRAIN_METRICS_NAME)
+    with open(metrics_path, "w") as f:
+        yaml.dump(all_train_metrics, f, sort_keys=False)
+    print(f"\n💾 All train metrics saved to: {metrics_path}")
     
+    print(f"\n🚀 NEXT STEP: Run 'python inference_linear.py'")
     task.close()
-    print("🎉 Training complete!")
 
 if __name__ == "__main__":
     main()

@@ -1,69 +1,73 @@
 # config.py
 import os
 
-# ======================================================
-# 1. ROOT PATH DEFINITION
-# ======================================================
-# Get the absolute path of the directory containing this config.py file
-# Assuming structure: project_root/src/config.py
-# -> PROJECT_ROOT will be project_root/
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-# ======================================================
-# 2. SUBDIRECTORY DEFINITIONS
-# ======================================================
 RAW_DATA_DIR = os.path.join(PROJECT_ROOT, 'raw_data')
 PROCESSED_DATA_DIR = os.path.join(PROJECT_ROOT, 'processed_data')
-FEATURE_DIR = os.path.join(PROJECT_ROOT, 'feature_data')
+# FEATURE_DIR = os.path.join(PROJECT_ROOT, 'feature_data')
 MODEL_DIR = os.path.join(PROJECT_ROOT, 'models')
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'inference_results')
 
-# Automatically create directories if they don't exist
 os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
-os.makedirs(FEATURE_DIR, exist_ok=True)
+# os.makedirs(FEATURE_DIR, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-print(f"📂 Project Root: {PROJECT_ROOT}")
-
 # ======================================================
-# 3. DATA PARAMETERS
+# DATA PARAMETERS
 # ======================================================
-# Change this to your data file (e.g., HanoiWeather.xlsx)
 RAW_FILE_NAME = "HCMWeatherDaily.xlsx" 
-TARGET_COL = "temp" # Target column to predict
+TARGET_COL = "temp"
+# ========================
+# FORECAST HORIZONS
+# ========================
+FORECAST_HORIZONS = [1, 2, 3, 4, 5, 6, 7]  # T+1 đến T+7
+TARGET_FORECAST_COLS = [f"target_t{h}" for h in FORECAST_HORIZONS]
+# ========================
+# CROSS-VALIDATION SETTINGS
+# ========================
+CV_N_SPLITS = 5      # Số folds cho TimeSeriesSplit
+CV_GAP_DAYS = 7      # Gap giữa train và val (khuyến nghị = max horizon)
 
 # ======================================================
-# 4. DATA SPLIT PARAMETERS
+# DATA SPLIT
 # ======================================================
 TRAIN_RATIO = 0.7
-VAL_RATIO = 0.15
-# TEST_RATIO = 1.0 - TRAIN_RATIO - VAL_RATIO (automatic)
+VAL_RATIO = 0.15 # 15% Val + 15% Test
 
 # ======================================================
-# 5. FEATURE ENGINEERING PARAMETERS
+# MODEL FILENAMES
 # ======================================================
-# Columns for creating lag/rolling features
-LAG_COLS = ["temp", "humidity", "precip", "windspeed", "sealevelpressure"]
-# Time intervals (days) for lags
-LAGS = [1, 2, 3, 7, 14]
-# Rolling windows (days)
-WINDOWS = [3, 7, 14]
-# Max lag (used for dropping NaNs in train set)
-MAX_LAG = max(max(LAGS), max(WINDOWS))
+PIPELINE_NAME = "feature_pipeline.pkl"
+SCALER_NAME = "scaler.pkl"
+MODEL_NAME = "model_linear.pkl"
+
+# Result filenames
+BENCHMARK_RESULTS_YAML = "benchmark_results.yaml"
+TRAIN_METRICS_NAME = "train_metrics_linear.yaml"
+OPTUNA_SCRIPT_NAME = "fine_tuning_linear.py"
+OPTUNA_RESULTS_YAML = "optuna_best_params_linear.yaml"
 
 # ======================================================
-# 6. TRAINING PARAMETERS
+# OPTUNA FINE-TUNING
 # ======================================================
-# Final model filename
-MODEL_NAME = "hcm_temp_pipeline.pkl"
-# Number of Optuna trials
-OPTUNA_TRIALS = 50
-# Number of folds for TimeSeriesSplit
-CV_SPLITS = 5
+OPTUNA_TRIALS = 300 
+
+LINEAR_PARAM_RANGES = {
+    # ✅ THÊM 'LinearRegression' VÀO ĐÂY
+    'model_type': ['LinearRegression', 'Ridge', 'Lasso', 'ElasticNet'],
+    
+    'alpha': (1e-5, 1e2), # (log=True)
+    'l1_ratio': (0.1, 0.9)
+}
 
 # ======================================================
-# 7. CLEARML PARAMETERS (Step 5)
+# CLEARML
 # ======================================================
 CLEARML_PROJECT_NAME = "HCM Weather Forecasting"
-CLEARML_TASK_NAME = "XGBoost Optuna Tuning"
+CLEARML_TASK_NAME = "LinearModel Fine-Tuning (7-day)"
+# ========================
+# MODEL TRAINING
+# ========================
+# FINAL_MODEL_PREFIX = "final_linear_model"  # Prefix cho model files
