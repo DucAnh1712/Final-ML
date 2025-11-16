@@ -156,25 +156,24 @@ st.markdown(f"""
     }}
     /* <<< SỬA ĐỔI: LÀM TRONG SUỐT SIDEBAR >>> */
     [data-testid="stSidebar"] > div:first-child {{
-        background: linear-gradient(165deg, rgba(224,244,255,0.6), rgba(120,185,255,0.18));
-        backdrop-filter: blur(26px);
-        color: {card_text_color};
-        border-right: 1px solid rgba(190, 230, 255, 0.4);
-        box-shadow: 0 24px 55px rgba(40, 110, 190, 0.14);
+        background: linear-gradient(180deg, rgba(8,15,32,0.95), rgba(23,38,68,0.92));
+        backdrop-filter: blur(12px);
+        color: #f5f9ff;
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 24px 55px rgba(0, 0, 0, 0.35);
         border-radius: 0 24px 24px 0;
     }}
     /* Đổi màu chữ mặc định cho các thành phần trong sidebar */
     .stSidebar [data-testid="stMarkdownContainer"] p {{
-        color: {card_text_color} !important;
+        color: #f5f9ff !important;
     }}
     /* <<< KẾT THÚC SỬA ĐỔI SIDEBAR >>> */
     .main-header {{
         font-size: 3rem;
         font-weight: bold;
         text-align: center;
-        background: linear-gradient(90deg, #FF6B6B, #4ECDC4);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: #f5f9ff;
+        text-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
         padding: 1rem 0;
     }}
     .metric-card {{
@@ -375,7 +374,7 @@ def get_weather_icon(temp: float) -> str:
 # ======================================================
 with st.sidebar:
     #st.image("https://img.icons8.com/clouds/200/000000/weather.png", width=150)
-    st.markdown("### 🌡️ Ho Chi Minh Weather Forecast")
+    st.markdown("<h3 style='color:#f5f9ff; margin-bottom:0.4rem;'>🌡️ Ho Chi Minh Weather Forecast</h3>", unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("**📊 Project Infor**")
     st.markdown(
