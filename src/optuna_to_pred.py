@@ -8,7 +8,7 @@ import lightgbm as lgb
 from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import mean_squared_error
 from clearml import Task
-import config_to_pred as config
+import daily.src.config_to_pred as config
 from feature_engineering import create_feature_pipeline
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
