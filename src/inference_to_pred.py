@@ -5,7 +5,7 @@ import numpy as np
 import joblib
 import yaml
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, mean_absolute_percentage_error
-import daily.src.config_to_pred as config
+import config_to_pred as config
 
 def load_production_models():
     print("Loading production components (LightGBM)...")

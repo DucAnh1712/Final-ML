@@ -8,7 +8,7 @@ from sklearn.preprocessing import RobustScaler
 import lightgbm as lgb
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from clearml import Task 
-import daily.src.config_to_pred as config
+import config_to_pred as config
 from feature_engineering import create_feature_pipeline
 
 def load_optuna_best_params_lgbm():

@@ -8,7 +8,7 @@ import lightgbm as lgb
 from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import mean_squared_error
 from clearml import Task
-import daily.src.config_to_pred as config
+import config_to_pred as config
 from feature_engineering import create_feature_pipeline
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -85,7 +85,7 @@ def load_data_for_tuning(target_name):
 # HÀM OBJECTIVE VỚI EARLY STOPPING
 # =============================================================================
 def lightgbm_objective(trial, X_all_train_raw, y_all_train_raw):
-    ranges = config.LIGHTGBM_PARAM_RANGES
+    ranges = config.PREDICT_PARAM_RANGES
     
     params = {
         'learning_rate': trial.suggest_float('learning_rate', *ranges['learning_rate'], log=True),
@@ -229,7 +229,7 @@ def run_optuna_search_lightgbm():
             "cv_strategy": "PurgedTimeSeriesSplit",
             "n_splits": config.CV_N_SPLITS,
             "gap_rows": config.CV_GAP_ROWS,
-            "search_space": config.LIGHTGBM_PARAM_RANGES, 
+            "search_space": config.PREDICT_PARAM_RANGES, 
             "leakage_safe": True
         }
     }
