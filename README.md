@@ -90,7 +90,6 @@ First, create a virtual environment and install all required dependencies.
     .\.venv\Scripts\activate
     ```
 3.  **Install the necessary libraries:**
-    (Note: `requirements.txt` should contain: `pandas`, `matplotlib`, `seaborn`, `openpyxl`, `scikit-learn`, `optuna`, `clearml`, `lgbm`, `xgboost`, `pyyaml`, `streamlit`, `onnxruntime`, `skl2onnx`)
     ```bash
     pip install -r requirements.txt
     ```
@@ -410,6 +409,7 @@ However, it exhibits a **rapid decline** in performance and a **significant degr
 To make our model accessible, we built a web application using Streamlit. This app loads the saved `feature_pipeline.pkl`, `scaler.pkl`, and the 7 trained model files (`.pkl`) to deliver a 7-day temperature forecast to the end-user in an interactive interface.
 
 You can access the live application here: https://aduongne-ml-final.hf.space
+
 -----
 
 ## 8\. Step 7: Retraining Strategy
@@ -480,8 +480,6 @@ The analysis yields a consistent conclusion across all key metrics:
 * **XGBoost** emerges as the overall **best performer** for long-term stability and accuracy (T+7).
 
 1. Absolute Accuracy Comparison (Test MAE and Test RMSE)
-
-This chart compares the average prediction error (RMSE) for the 7-day forecast. **Lower is better.**
 
 ![alt text](hourly/inference_results/compare_ALL_MODELS_Test_RMSE.png)
 ![alt text](hourly/inference_results/compare_ALL_MODELS_Test_MAE.png)
@@ -579,3 +577,4 @@ The benchmark comparing the native Scikit-learn model with the converted ONNX mo
 
 
 **Conclusion:** Converting our Scikit-learn models to ONNX and utilizing the ONNX Runtime resulted in an astonishing **$\approx 25.8$ times speed increase** in inference time compared to the native Python implementation. This ensures the forecasting system can handle hourly prediction requests with extremely low latency in a production environment.
+
