@@ -20,16 +20,11 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # =============================================================================
 class PurgedTimeSeriesSplit:
     """
-    Time Series Cross-Validation với gap để tránh data leakage
-    
+    Time Series Cross-Validation with a gap to prevent leakage.
     Parameters:
     -----------
-    n_splits : int
-        Số lượng folds
-    gap : int
-        Số rows bỏ qua giữa train và validation (purge window)
-        Ví dụ: gap=7 nghĩa là bỏ 7 ngày sau train, trước khi validation bắt đầu
-    
+    n_splits : int (fold numbers)
+    gap : int (purge window)
     Example:
     --------
     |-------- Train --------|  GAP (7 days)  |---- Val ----|
@@ -43,24 +38,16 @@ class PurgedTimeSeriesSplit:
         n_samples = len(X)
         indices = np.arange(n_samples)
         
-        # Tính kích thước mỗi fold
         test_size = n_samples // (self.n_splits + 1)
         
         for i in range(self.n_splits):
-            # Train: từ đầu đến split point
             train_end = (i + 1) * test_size
-            
-            # Gap: loại bỏ `gap` rows sau train
             val_start = train_end + self.gap
             val_end = val_start + test_size
-            
-            # Đảm bảo không vượt quá dataset
             if val_end > n_samples:
                 break
-            
             train_indices = indices[:train_end]
             val_indices = indices[val_start:val_end]
-            
             yield train_indices, val_indices
     
     def get_n_splits(self, X=None, y=None, groups=None):

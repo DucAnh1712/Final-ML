@@ -1,4 +1,4 @@
-# benchmark.py (V3 - Adding Ridge & DecisionTree)
+# benchmark.py
 import os
 import pandas as pd
 import numpy as np
@@ -49,7 +49,7 @@ def align_data_v2(X_raw, y_raw, pipeline, scaler, fit_transform=False):
     return X_clean, y_clean
 
 def run_benchmark():
-    print(f"🚀 STARTING MODEL BENCHMARK (V3 - Adding Ridge/Tree)")
+    print(f"🚀 STARTING MODEL BENCHMARK")
     print("="*70)
     print(f"Features: Derived Features (from Colab)")
     print("="*70)
@@ -211,7 +211,7 @@ def run_benchmark():
     # 5. SHOW & SAVE RESULTS
     # ======================================================
     print("\n" + "="*70)
-    print("🏆 FINAL BENCHMARK RESULTS (DERIVED FEATURES V3) 🏆")
+    print("🏆 FINAL BENCHMARK RESULTS 🏆")
     print("="*70)
     
     results_df = pd.DataFrame(results).sort_values(by="Test_RMSE")

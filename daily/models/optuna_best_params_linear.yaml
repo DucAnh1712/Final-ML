@@ -1,64 +1,63 @@
 best_params:
   target_t1:
     model_type: Lasso
-    alpha: 0.005816255008287374
+    alpha: 0.0058429306894065116
   target_t2:
     model_type: Lasso
-    alpha: 0.004636402746141265
+    alpha: 0.004645451905492832
   target_t3:
     model_type: Ridge
-    alpha: 13.353798387715436
+    alpha: 13.3948737193286
   target_t4:
-    model_type: ElasticNet
-    alpha: 0.018304829675341822
-    l1_ratio: 0.2344547986969784
+    model_type: Ridge
+    alpha: 13.460076438290539
   target_t5:
     model_type: ElasticNet
-    alpha: 0.015871857651903597
-    l1_ratio: 0.10021947053598276
+    alpha: 0.015883701852649226
+    l1_ratio: 0.10106058371506685
   target_t6:
     model_type: ElasticNet
-    alpha: 0.020513670602239246
-    l1_ratio: 0.10036773940728891
+    alpha: 0.020626838091571235
+    l1_ratio: 0.10022283303667552
   target_t7:
     model_type: ElasticNet
-    alpha: 0.026698792385607698
-    l1_ratio: 0.10079597443296405
+    alpha: 0.026490507756225922
+    l1_ratio: 0.11106544530857561
 best_scores:
-  target_t1: 0.8026628864872218
-  target_t2: 0.9964054786461995
-  target_t3: 1.0535996477780176
-  target_t4: 1.071835436633966
-  target_t5: 1.0893691393024048
-  target_t6: 1.1053525924342629
-  target_t7: 1.1230447219830155
+  target_t1: 0.8026633454330522
+  target_t2: 0.9964064057237852
+  target_t3: 1.053599592113996
+  target_t4: 1.0714867929734546
+  target_t5: 1.089371409226389
+  target_t6: 1.1053514392828836
+  target_t7: 1.1230502855549813
 details:
   target_t1:
-    val_rmse: 0.8026628864872218
+    val_rmse: 0.8026633454330522
     n_folds: 5
     gap_days: 7
   target_t2:
-    val_rmse: 0.9964054786461995
+    val_rmse: 0.9964064057237852
     n_folds: 5
     gap_days: 7
   target_t3:
-    val_rmse: 1.0535996477780176
+    val_rmse: 1.053599592113996
     n_folds: 5
     gap_days: 7
   target_t4:
-    val_rmse: 1.071835436633966
+    val_rmse: 1.0714867929734546
     n_folds: 5
     gap_days: 7
   target_t5:
-    val_rmse: 1.0893691393024048
+    val_rmse: 1.089371409226389
     n_folds: 5
     gap_days: 7
   target_t6:
-    val_rmse: 1.1053525924342629
+    val_rmse: 1.1053514392828836
     n_folds: 5
     gap_days: 7
   target_t7:
-    val_rmse: 1.1230447219830155
+    val_rmse: 1.1230502855549813
     n_folds: 5
     gap_days: 7
 config:

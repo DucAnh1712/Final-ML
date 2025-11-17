@@ -84,24 +84,21 @@ class DerivedFeatureTransformer(BaseEstimator, TransformerMixin):
 
 class ColumnPreprocessor(BaseEstimator, TransformerMixin):
     """
-    Select và preprocess final columns
-    ✅ SAFE: Forward-fill chỉ trong fold (protected by gap)
+    Select and preprocess final columns
     """
     def __init__(self):
-        # Core weather features (quan trọng cho HCM)
+        # Core weather features
         self.feature_cols = [
             'humidity', 'sealevelpressure', 'dew', 'cloudcover', 
             'solarradiation', 'visibility', 'windspeed', 'windgust', 'precip',
-            'temp'  # Sẽ bị remove sau (tránh target leakage)
+            'temp'  # Will be removed in fit() to avoid leakage
         ]
-        
         # Derived features
         self.derived_cols = [
             'month_sin', 'month_cos', 'day_sin', 'day_cos',
             'daylight_hours', 'solar_per_hour', 'temp_range',
             'dewpoint_depression', 'sealevelpressure_change'
         ]
-        
         self.final_cols = []
     
     def fit(self, X, y=None):
@@ -121,11 +118,9 @@ class ColumnPreprocessor(BaseEstimator, TransformerMixin):
     def transform(self, X):
         """Select columns and handle missing values"""
         df = X[self.final_cols].copy()
-        
         # ✅ SAFE IMPUTATION STRATEGY:
-        # Forward-fill là OK vì:
-        # 1. Gap trong CV đảm bảo không leak giữa train/val
-        # 2. Phản ánh thực tế: Sensors thường giữ giá trị cuối nếu bị lỗi
+        # 1. Gap in CV prevents leakage
+        # 2. Sensor readings are often stable over short periods
         df = df.ffill().bfill().fillna(0)
         
         return df

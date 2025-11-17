@@ -8,6 +8,7 @@ PROCESSED_DATA_DIR = os.path.join(PROJECT_ROOT, 'processed_data')
 # FEATURE_DIR = os.path.join(PROJECT_ROOT, 'feature_data')
 MODEL_DIR = os.path.join(PROJECT_ROOT, 'models')
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'inference_results')
+PLOT_DIR = os.path.join(PROJECT_ROOT, 'plots')
 
 os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
 # os.makedirs(FEATURE_DIR, exist_ok=True)

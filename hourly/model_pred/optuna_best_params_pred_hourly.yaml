@@ -1,0 +1,387 @@
+best_params:
+  target_t1:
+    learning_rate: 0.03492614454827348
+    max_depth: 9
+    subsample: 0.8773845449138737
+    colsample_bytree: 0.6306069975605841
+    reg_alpha: 0.3967632198225458
+    reg_lambda: 53.76778152765429
+    num_leaves: 21
+    n_estimators: 1424
+  target_t2:
+    learning_rate: 0.02066489408209088
+    max_depth: 7
+    subsample: 0.7535648493169526
+    colsample_bytree: 0.6876982077117109
+    reg_alpha: 17.156866495427142
+    reg_lambda: 0.004764038160194105
+    num_leaves: 24
+    n_estimators: 1224
+  target_t3:
+    learning_rate: 0.055724485563218434
+    max_depth: 8
+    subsample: 0.9177727850902612
+    colsample_bytree: 0.6952121605236181
+    reg_alpha: 0.0007749460016493605
+    reg_lambda: 17.977198300918282
+    num_leaves: 103
+    n_estimators: 148
+  target_t4:
+    learning_rate: 0.00924767127631093
+    max_depth: 8
+    subsample: 0.8123447816361633
+    colsample_bytree: 0.6589905827363834
+    reg_alpha: 7.84344914731648
+    reg_lambda: 0.000133562833888164
+    num_leaves: 77
+    n_estimators: 821
+  target_t5:
+    learning_rate: 0.00665707070333307
+    max_depth: 7
+    subsample: 0.8594329233159599
+    colsample_bytree: 0.6433754063039979
+    reg_alpha: 0.24464133435160496
+    reg_lambda: 0.005740717972138728
+    num_leaves: 58
+    n_estimators: 1136
+  target_t6:
+    learning_rate: 0.013040905773554405
+    max_depth: 7
+    subsample: 0.7166798927862891
+    colsample_bytree: 0.7560164301661709
+    reg_alpha: 0.013544610831549229
+    reg_lambda: 6.18518539826479
+    num_leaves: 81
+    n_estimators: 470
+  target_t7:
+    learning_rate: 0.011973352146107006
+    max_depth: 7
+    subsample: 0.926376232076989
+    colsample_bytree: 0.8462650705944631
+    reg_alpha: 5.802430478353665
+    reg_lambda: 1.0466504829971798e-05
+    num_leaves: 50
+    n_estimators: 538
+  target_t8:
+    learning_rate: 0.006745820878800074
+    max_depth: 9
+    subsample: 0.9116687351652597
+    colsample_bytree: 0.785803811366717
+    reg_alpha: 2.7143249006285184
+    reg_lambda: 27.144717201740047
+    num_leaves: 59
+    n_estimators: 874
+  target_t9:
+    learning_rate: 0.04485541642058945
+    max_depth: 6
+    subsample: 0.6749759302886946
+    colsample_bytree: 0.9373436396481285
+    reg_alpha: 0.005928675721919772
+    reg_lambda: 0.18889665776566758
+    num_leaves: 72
+    n_estimators: 101
+  target_t10:
+    learning_rate: 0.00392990272854723
+    max_depth: 10
+    subsample: 0.8599094518296821
+    colsample_bytree: 0.9609758387913142
+    reg_alpha: 33.7211757091481
+    reg_lambda: 0.00980731825361088
+    num_leaves: 34
+    n_estimators: 1316
+  target_t11:
+    learning_rate: 0.0028145099472715812
+    max_depth: 6
+    subsample: 0.7502679698595395
+    colsample_bytree: 0.8387226598325652
+    reg_alpha: 0.02916973415670209
+    reg_lambda: 0.000686827229082863
+    num_leaves: 75
+    n_estimators: 1625
+  target_t12:
+    learning_rate: 0.008192916062832298
+    max_depth: 5
+    subsample: 0.8571228423714198
+    colsample_bytree: 0.6834780955490406
+    reg_alpha: 0.090267834726606
+    reg_lambda: 0.020252032970597363
+    num_leaves: 98
+    n_estimators: 737
+  target_t13:
+    learning_rate: 0.015085914372851863
+    max_depth: 8
+    subsample: 0.6384127312385093
+    colsample_bytree: 0.7493886491660986
+    reg_alpha: 17.02520017239219
+    reg_lambda: 2.1094830067188946e-05
+    num_leaves: 34
+    n_estimators: 341
+  target_t14:
+    learning_rate: 0.02645406843434404
+    max_depth: 8
+    subsample: 0.9961742081490772
+    colsample_bytree: 0.6838059116472983
+    reg_alpha: 13.397128721120525
+    reg_lambda: 0.1460554602658404
+    num_leaves: 46
+    n_estimators: 184
+  target_t15:
+    learning_rate: 0.0060088481583247385
+    max_depth: 7
+    subsample: 0.6745413830703112
+    colsample_bytree: 0.8187254506887178
+    reg_alpha: 8.98612481375301
+    reg_lambda: 7.7590526726993e-05
+    num_leaves: 30
+    n_estimators: 948
+  target_t16:
+    learning_rate: 0.0044632107242570706
+    max_depth: 6
+    subsample: 0.9648563695200462
+    colsample_bytree: 0.823013211785343
+    reg_alpha: 2.0818263017367635
+    reg_lambda: 0.010266632661379409
+    num_leaves: 80
+    n_estimators: 1022
+  target_t17:
+    learning_rate: 0.004379795536471127
+    max_depth: 6
+    subsample: 0.6679475846512982
+    colsample_bytree: 0.9186577428259198
+    reg_alpha: 2.4978135784668886e-05
+    reg_lambda: 18.415232422465184
+    num_leaves: 111
+    n_estimators: 958
+  target_t18:
+    learning_rate: 0.004741009310813676
+    max_depth: 6
+    subsample: 0.7010022278563963
+    colsample_bytree: 0.8255428225930851
+    reg_alpha: 1.4005986182597228
+    reg_lambda: 9.492371605586623
+    num_leaves: 65
+    n_estimators: 1041
+  target_t19:
+    learning_rate: 0.01769408575129222
+    max_depth: 10
+    subsample: 0.7115788200875571
+    colsample_bytree: 0.6942380423534441
+    reg_alpha: 43.44623718152135
+    reg_lambda: 0.3405311052837457
+    num_leaves: 20
+    n_estimators: 533
+  target_t20:
+    learning_rate: 0.04529262886621604
+    max_depth: 5
+    subsample: 0.8005568917744617
+    colsample_bytree: 0.8678593410588159
+    reg_alpha: 0.0011237274533212132
+    reg_lambda: 8.247505363640167e-05
+    num_leaves: 53
+    n_estimators: 119
+  target_t21:
+    learning_rate: 0.011973436373479697
+    max_depth: 5
+    subsample: 0.7290145793128012
+    colsample_bytree: 0.6992229093502789
+    reg_alpha: 29.72634251538706
+    reg_lambda: 0.48747395071227206
+    num_leaves: 87
+    n_estimators: 629
+  target_t22:
+    learning_rate: 0.007397930856178428
+    max_depth: 7
+    subsample: 0.6924306349521769
+    colsample_bytree: 0.7831338376925171
+    reg_alpha: 19.48908150022412
+    reg_lambda: 0.11922782080835082
+    num_leaves: 31
+    n_estimators: 803
+  target_t23:
+    learning_rate: 0.020492633258744165
+    max_depth: 6
+    subsample: 0.9792841169699671
+    colsample_bytree: 0.6633688581438755
+    reg_alpha: 17.232055107765653
+    reg_lambda: 0.003487378698399584
+    num_leaves: 94
+    n_estimators: 264
+  target_t24:
+    learning_rate: 0.030316552279689594
+    max_depth: 6
+    subsample: 0.9659805903448033
+    colsample_bytree: 0.6404602759278111
+    reg_alpha: 3.933390324236593
+    reg_lambda: 4.345632974017628e-05
+    num_leaves: 101
+    n_estimators: 172
+best_scores:
+  target_t1: 0.871108686102901
+  target_t2: 1.0869267610847402
+  target_t3: 1.1961545338181088
+  target_t4: 1.259531294927179
+  target_t5: 1.3061724284545713
+  target_t6: 1.338902055395141
+  target_t7: 1.365345139473214
+  target_t8: 1.3804325248758267
+  target_t9: 1.3917216785198374
+  target_t10: 1.400455734911353
+  target_t11: 1.4074400845856767
+  target_t12: 1.4140894533648045
+  target_t13: 1.4182420001418943
+  target_t14: 1.4261670511015017
+  target_t15: 1.4310621286799061
+  target_t16: 1.4392187958286145
+  target_t17: 1.4451601968478363
+  target_t18: 1.4526339753559565
+  target_t19: 1.4567395181957197
+  target_t20: 1.4594482115414695
+  target_t21: 1.4568804634852415
+  target_t22: 1.4564868995254645
+  target_t23: 1.4572603084632296
+  target_t24: 1.4577175745178834
+details:
+  target_t1:
+    val_rmse: 0.871108686102901
+    avg_best_iteration: 1424
+    n_folds: 5
+    gap_rows: 168
+  target_t2:
+    val_rmse: 1.0869267610847402
+    avg_best_iteration: 1224
+    n_folds: 5
+    gap_rows: 168
+  target_t3:
+    val_rmse: 1.1961545338181088
+    avg_best_iteration: 148
+    n_folds: 5
+    gap_rows: 168
+  target_t4:
+    val_rmse: 1.259531294927179
+    avg_best_iteration: 821
+    n_folds: 5
+    gap_rows: 168
+  target_t5:
+    val_rmse: 1.3061724284545713
+    avg_best_iteration: 1136
+    n_folds: 5
+    gap_rows: 168
+  target_t6:
+    val_rmse: 1.338902055395141
+    avg_best_iteration: 470
+    n_folds: 5
+    gap_rows: 168
+  target_t7:
+    val_rmse: 1.365345139473214
+    avg_best_iteration: 538
+    n_folds: 5
+    gap_rows: 168
+  target_t8:
+    val_rmse: 1.3804325248758267
+    avg_best_iteration: 874
+    n_folds: 5
+    gap_rows: 168
+  target_t9:
+    val_rmse: 1.3917216785198374
+    avg_best_iteration: 101
+    n_folds: 5
+    gap_rows: 168
+  target_t10:
+    val_rmse: 1.400455734911353
+    avg_best_iteration: 1316
+    n_folds: 5
+    gap_rows: 168
+  target_t11:
+    val_rmse: 1.4074400845856767
+    avg_best_iteration: 1625
+    n_folds: 5
+    gap_rows: 168
+  target_t12:
+    val_rmse: 1.4140894533648045
+    avg_best_iteration: 737
+    n_folds: 5
+    gap_rows: 168
+  target_t13:
+    val_rmse: 1.4182420001418943
+    avg_best_iteration: 341
+    n_folds: 5
+    gap_rows: 168
+  target_t14:
+    val_rmse: 1.4261670511015017
+    avg_best_iteration: 184
+    n_folds: 5
+    gap_rows: 168
+  target_t15:
+    val_rmse: 1.4310621286799061
+    avg_best_iteration: 948
+    n_folds: 5
+    gap_rows: 168
+  target_t16:
+    val_rmse: 1.4392187958286145
+    avg_best_iteration: 1022
+    n_folds: 5
+    gap_rows: 168
+  target_t17:
+    val_rmse: 1.4451601968478363
+    avg_best_iteration: 958
+    n_folds: 5
+    gap_rows: 168
+  target_t18:
+    val_rmse: 1.4526339753559565
+    avg_best_iteration: 1041
+    n_folds: 5
+    gap_rows: 168
+  target_t19:
+    val_rmse: 1.4567395181957197
+    avg_best_iteration: 533
+    n_folds: 5
+    gap_rows: 168
+  target_t20:
+    val_rmse: 1.4594482115414695
+    avg_best_iteration: 119
+    n_folds: 5
+    gap_rows: 168
+  target_t21:
+    val_rmse: 1.4568804634852415
+    avg_best_iteration: 629
+    n_folds: 5
+    gap_rows: 168
+  target_t22:
+    val_rmse: 1.4564868995254645
+    avg_best_iteration: 803
+    n_folds: 5
+    gap_rows: 168
+  target_t23:
+    val_rmse: 1.4572603084632296
+    avg_best_iteration: 264
+    n_folds: 5
+    gap_rows: 168
+  target_t24:
+    val_rmse: 1.4577175745178834
+    avg_best_iteration: 172
+    n_folds: 5
+    gap_rows: 168
+config:
+  n_trials: 50
+  cv_strategy: PurgedTimeSeriesSplit
+  n_splits: 5
+  gap_rows: 168
+  search_space:
+    learning_rate: !!python/tuple
+    - 0.001
+    - 0.1
+    max_depth: !!python/tuple
+    - 3
+    - 10
+    subsample: &id001 !!python/tuple
+    - 0.6
+    - 1.0
+    colsample_bytree: *id001
+    reg_alpha: &id002 !!python/tuple
+    - 1.0e-05
+    - 100.0
+    reg_lambda: *id002
+    num_leaves: !!python/tuple
+    - 20
+    - 150
+  leakage_safe: true
