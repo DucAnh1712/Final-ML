@@ -9,8 +9,7 @@
 
 The core objective of this project is to build a complete Machine Learning system capable of forecasting the average daily temperature in Ho Chi Minh City (Saigon) for the **next 7 days** ($T+1$ to $T+7$).
 
-To achieve this, we began by collecting 10 years of historical daily weather data (Jan 2015 - Dec 2025) from Visual Crossing, resulting in a raw dataset of 3,934 entries and 33 features.
-
+To achieve this, we began by collecting **over 10 years** of historical daily weather data, specifically from **January 1, 2015, to October 8, 2025**, from Visual Crossing. This resulted in a raw dataset of **3,934 entries** and **33 features**.
 -----
 
 ## 2\. Project Structure
@@ -20,67 +19,160 @@ The project is organized into a modular MLOps pipeline, separating concerns from
 ```
 Final-ML/
 ├── daily/
-│   ├── data/
-│   │   ├── raw_data/
-│   │   │   └── HCMWeatherDaily.xlsx    # Raw 10-year data (Input)
-│   │   └── processed_data/
-│   │       ├── data_train.csv          # 70% of data
-│   │       ├── data_val.csv            # 15% of data
-│   │       └── data_test.csv           # 15% of data
+│   ├── raw_data/
+│   │   └── HCMWeatherDaily.xlsx    # Raw 10-year data (Input)
+│   └── processed_data/
+│       ├── data_train.csv          # 70% of data
+│       ├── data_val.csv            # 15% of data
+│       └── data_test.csv           # 15% of data
 │   ├── src/
 │   │   ├── visualize_weather.py        # Step 2: EDA script
 │   │   ├── data_processing.py          # Step 3: Data splitting script
 │   │   ├── feature_engineering.py      # Step 4: Feature pipeline
-│   │   ├── benchmark.py                # Step 5: Model comparison
+│   │   ├── benchmark.py                # Step 5: Model comparison (Linear, XGB...)
 │   │   ├── optuna_search_linear.py     # Step 5: Hyperparameter tuning
 │   │   ├── train.py                    # Step 5: Final model training
 │   │   ├── inference.py                # Step 5: Final model evaluation
 │   │   ├── visualize_results.py        # Step 5: Final model visualization
-│   │   └── inference.py                # Step 5: Final model evaluation
-│   ├── plots/                        # Output for visualize_weather.py
-│   ├── models/                       # Output for optuna_search_linear.py
-│   └── inference_results/            # Metrics for train.py and inference.py
-├── hourly/                           # Code for Step 8
-├── README.md                         # This report
-├── requirements.txt                  # Project dependencies
-└── scaler.pkl                        # Saved scaler from training
+│   │   ├── assets/
+│   │   |   ├── day_sky_background.png      # Background of daily Streamlit
+│   │   ├── app.py                      # Streamlit UI code
+│   │   ├── convert_to_onnx.py          # Step 9: Script convert to ONNX
+│   │   └── benchmark_onnx.py           # Step 9: ONNX speed comparison
+│   ├── plots/                      # Output for visualize_weather.py
+│   │   ├── correlation_heatmap.png
+│   │   ├── daily_temp_timeseries.png
+│   │   └── ...
+│   ├── models/                     # Output for optuna_search_linear.py
+│   │   ├── feature_pipeline.pkl
+│   │   ├── onnx_convertible_pipeline.pkl
+│   │   ├── optuna_best_params_linear.yaml
+│   │   ├── scaler.pkl              # Saved scaler from training
+│   │   ├── target_t1_model_linear.pkl
+│   │   ├── target_t1_model_linear.pkl.onnx
+│   │   └── ... (7 models .pkl and .onnx)
+│   └── inference_results/          # Metrics for train.py and inference.py
+│   │   ├── benchmark_results.yaml
+│   │   ├── inference_benchmark.yaml
+│   │   ├── rmse_by_horizon.png
+│   │   ├── test_metrics_linear.yaml
+│   │   └── ...
+├── hourly/                     # Code for Step 8
+├── project_subjects.pdf       
+├── README.md                   # This report
+└── requirements.txt            # Project dependencies
 ```
 
 -----
-
 ## 3\. How to Run
 
-### Requirements
+This guide provides the complete step-by-step instructions to replicate the project, from data processing to final application.
 
-Install the necessary libraries:
+### 3.1. Environment Setup
 
-```bash
-pip install -r requirements.txt
-```
+First, create a virtual environment and install all required dependencies.
 
-*(Note: `requirements.txt` should contain `pandas`, `matplotlib`, `seaborn`, `openpyxl`, `scikit-learn`, `optuna`, `clearml`, `lgbm`, `xgboost`, `pyyaml`)*
+1.  **Create a virtual environment:**
+    ```bash
+    # For macOS/Linux
+    python3 -m venv .venv
+    # For Windows
+    python -m venv .venv
+    ```
+2.  **Activate the environment:**
+    ```bash
+    # For macOS/Linux
+    source .venv/bin/activate
+    # For Windows
+    .\.venv\Scripts\activate
+    ```
+3.  **Install the necessary libraries:**
+    (Note: `requirements.txt` should contain: `pandas`, `matplotlib`, `seaborn`, `openpyxl`, `scikit-learn`, `optuna`, `clearml`, `lgbm`, `xgboost`, `pyyaml`, `streamlit`, `onnxruntime`, `skl2onnx`)
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-### Execution Steps
 
-**1. Run Exploratory Data Analysis (EDA):**
-This script reads the raw Excel file and generates all analysis plots in the `/daily/plots/` folder.
+### 3.2. Main Execution Pipeline
 
-```bash
-python daily/src/visualize_weather.py
-```
+Follow these steps in order. Each script processes data and saves its output, which is then used by the next script.
 
-**2. Run Data Processing (ML Preparation):**
-This script reads the raw Excel, creates the 7-day targets, and splits the data by time into `train/val/test` CSVs.
+1.  **Run Exploratory Data Analysis (EDA):**
+    This script reads the raw Excel file and generates all analysis plots (e.g., `correlation_heatmap.png`, `daily_temp_timeseries.png`) in the **`/daily/plots/`** folder.
 
-```bash
-python daily/src/data_processing.py
-```
+    ```bash
+    python daily/src/visualize_weather.py
+    ```
+
+2.  **Run Data Processing:**
+    This script reads the raw Excel, creates the 7-day targets, and splits the data by time into `data_train.csv`, `data_val.csv`, and `data_test.csv` inside the **`/daily/processed_data/`** folder.
+
+    ```bash
+    python daily/src/data_processing.py
+    ```
+
+3.  **Run Model Benchmarking:**
+    This script trains 6 different models (Linear Regression, XGBoost, etc.) on the T+1 data to find the best model type. Results are saved in **`/daily/inference_results/benchmark_results.yaml`**.
+
+    ```bash
+    python daily/src/benchmark.py
+    ```
+
+4.  **Run Hyperparameter Tuning:**
+    Based on the benchmark, this script uses Optuna to fine-tune the chosen model (Linear Regression) for all 7 forecast horizons. The best parameters are saved in **`/daily/models/optuna_best_params_linear.yaml`**.
+
+    ```bash
+    python daily/src/optuna_search_linear.py
+    ```
+
+5.  **Run Final Model Training:**
+    This script loads the best parameters from Optuna and trains the 7 final models (one for each day, T+1 to T+7). The final models (`.pkl`), scaler, and pipelines are saved in the **`/daily/models/`** folder.
+
+    ```bash
+    python daily/src/train.py
+    ```
+
+6.  **Run Final Inference & Evaluation:**
+    This script loads the 7 trained models and evaluates them on the `data_test.csv` set. Final metrics (e.g., `test_metrics_linear.yaml`) and predictions are saved in **`/daily/inference_results/`**.
+
+    ```bash
+    python daily/src/inference.py
+    ```
+
+7.  **Visualize Final Results:**
+    (Tùy chọn) Script này đọc các tệp metrics từ bước 6 và tạo các biểu đồ so sánh (ví dụ: `rmse_by_horizon.png`) để đánh giá trực quan hiệu suất của mô hình.
+
+    ```bash
+    python daily/src/visualize_results.py 
+    ```
+
+    *(Lưu ý: Đảm bảo bạn có tệp `visualize_results.py` này trong thư mục `src`)*
+
+
+### 3.3. Running the Application & Optimization
+
+1.  **Run the Streamlit Web App:**
+    This command starts the local web server and opens the Streamlit application in your browser to interact with the trained models.
+
+    ```bash
+    streamlit run daily/src/app.py
+    ```
+
+2.  **Run ONNX Conversion & Benchmark (Optional):**
+    These steps are for optimizing and testing deployment speed.
+
+    ```bash
+    # Step 1: Convert the 7 trained .pkl models to .onnx format
+    python daily/src/convert_to_onnx.py
+
+    # Step 2: Run a speed test comparing Sklearn vs. ONNX inference time
+    python daily/src/benchmark_onnx.py
+    ```
 
 -----
+## 4. Step 2: Exploratory Data Analysis (EDA)
 
-## 4\. Step 2: Exploratory Data Analysis (EDA)
-
-Before building any models, we ran `visualize_weather.py` to deeply understand the data, as detailed in the project notebook. This step answers the core questions from the project brief.
+Before building any models, we ran `visualize_weather.py` to deeply understand the data. This step answers the core questions from the project brief.
 
 ### 4.1. Data Dictionary (Understanding the Features)
 
@@ -88,42 +180,60 @@ The brief asks: *"Explain the meaning and values in each column. For example, wh
 
 The dataset has 33 features. While most are self-explanatory (e.g., `temp`, `humidity`, `precip`), key specialized columns include:
 
-  * **`dew` (Dew Point):** The temperature at which air becomes 100% saturated and dew forms.
-  * **`solarradiation` (Solar Radiation):** Average solar energy received, measured in $W/m^{2}$.
-  * **`moonphase` (Moon Phase):** A value from 0 to 1 representing the lunar cycle:
-      * `0.0`: New Moon
-      * `0.5`: Full Moon
-      * `0.75`: Last Quarter
+* **`dew` (Dew Point):** The temperature at which air becomes 100% saturated and dew forms.
+* **`solarradiation` (Solar Radiation):** Average solar energy received, measured in $W/m^2$.
+* **`moonphase` (Moon Phase):** A value from 0 to 1 representing the lunar cycle:
+    * `0.0`: New Moon
+    * `0.5`: Full Moon
+    * `0.75`: Last Quarter
 
 ### 4.2. Target Column Analysis (The 10-Year Trend)
 
-The brief asks: *"Try to plot the target column... What is your observation about... the last 10 years?"*.
+We plotted the target column, `temp` (Average Daily Temperature), over the 10-year period.
 
-[cite\_start]We plotted the target column, `temp` (Average Daily Temperature), over the 10-year period [cite: 79, 81-88].
-
-*Plot `daily_temp_timeseries.png`: The target variable (`temp`) over 10 years.*
+![alt text](image.png)
 
 **Observations:**
 
-1.  **Clear Seasonality:** A strong, consistent annual cycle is visible. The temperature peaks every year around April/May and hits its low point in December/January.
-2.  **Stable Range:** The temperature oscillates in a very tight and predictable range, almost entirely between 24°C and 33°C.
+1.  **Clear Seasonality:** A strong, consistent annual cycle is visible. The temperature peaks every year during the hot season (around **April/May**) and hits its low point in the cool season (**December/January**).
+2.  **Stable Range:** The temperature oscillates in a very tight and predictable range, almost entirely between **24°C and 33°C**.
 
 We also plotted the average annual temperature to check for a long-term trend.
 
-*Plot `annual_avg_temp.png`: Checking for long-term trends.*
+![alt text](image-1.png)
 
 This plot shows significant year-to-year variation, with a cool year in 2017 (28.1°C) and a sharp peak in 2024 (29.1°C). Overall, the data suggests a **slight warming trend** across the decade.
 
+#### 4.2.1. Phân tích Phân phối (Bổ sung từ IPYNB)
+
+Notebook cũng phân tích histogram của cột `temp` để xem phân phối của nó.
+
+
+> **Plot (`temp_distribution.png`):** Phân phối của nhiệt độ.
+
+**Findings:**
+1.  **Slightly Bimodal (Hai đỉnh nhẹ):** Có hai đỉnh nhỏ, một quanh 27.5°C (Mùa mưa) và một quanh 30°C (Mùa khô).
+2.  **Left-Skewed (Lệch trái):** Dữ liệu hơi lệch về phía bên trái, cho thấy có nhiều ngày mát mẻ hơn một chút so với những ngày cực kỳ nóng.
+
 ### 4.3. Annual & Seasonal Trends
 
-[cite\_start]The data clearly shows two distinct seasons: a **Dry Season** (Dec-Apr) and a **Rainy Season** (May-Nov) [cite: 238, 241, 800-802]. We used boxplots to visualize the difference:
+The data clearly shows two distinct seasons: a **Dry Season** (Dec-Apr) and a **Rainy Season** (May-Nov). We used boxplots to visualize the difference:
 
-*Plot `seasonal_boxplots.png`: This perfectly summarizes HCMC's climate.*
+![alt text](image-2.png)
 
-  * **Dry Season (Left):** Characterized by lower humidity, almost zero rainfall, and slightly higher average temperatures.
-  * **Rainy Season (Right):** Characterized by extremely high humidity, frequent heavy rainfall, and slightly cooler, more stable temperatures.
+* **Dry Season (Left):** Characterized by lower humidity, almost zero rainfall, and slightly higher average temperatures.
+* **Rainy Season (Right):** Characterized by extremely high humidity, frequent heavy rainfall, and slightly cooler, more stable temperatures.
 
 This seasonal pattern is the most dominant feature of the dataset.
+
+#### 4.3.1. Phân tích Climograph (Bổ sung từ IPYNB)
+
+Để xác nhận mối quan hệ chu kỳ này, notebook đã vẽ biểu đồ khí hậu (climograph).
+
+
+> **Plot (`climograph_temp_humidity.png`):** Mối quan hệ giữa Nhiệt độ và Độ ẩm.
+
+**Finding:** Biểu đồ cho thấy một **mối quan hệ "vòng lặp" (looping relationship)** rõ rệt. Nó không đi theo đường thẳng, mà thay vào đó, thời tiết "di chuyển" qua các mùa: từ Nóng & Khô (quý 1) -> Nóng & Ẩm (quý 2) -> Mát & Ẩm (quý 3/4) -> và quay trở lại. Đây là bằng chứng trực quan mạnh mẽ cho thấy thời tiết là một chu kỳ.
 
 ### 4.4. Correlation Analysis (Answering "How they combine")
 
@@ -131,23 +241,22 @@ The brief asks: *"Try to understand the relationship between different features.
 
 We generated a correlation matrix (heatmap) and scatter plots to find the key drivers of temperature.
 
-*Plot `correlation_heatmap.png`: The relationship between all 33 features.*
+
+> **Plot (`correlation_heatmap.png`):** The relationship between all 33 features.
 
 **Key Findings:**
 
-1.  **High Multicollinearity:** There are two groups of redundant features:
-
-      * **Temperature Group:** `temp`, `tempmax`, `tempmin`, and `feelslike` are all correlated at $r > 0.90$.
-      * **Solar Group:** `solarradiation`, `solarenergy`, and `uvindex` are correlated at $r \approx 1.00$.
-      * **Action:** We must *not* use all these features in our model. [cite\_start]We will select one representative from each group [cite: 377-380].
+1.  **High Multicollinearity (Đa cộng tuyến):** There are groups of redundant features:
+    * **Temperature Group:** `temp`, `tempmax`, `tempmin`, and `feelslike` are all correlated at $r > 0.90$.
+    * **Solar Group:** `solarradiation`, `solarenergy`, and `uvindex` are correlated at $r \approx 1.00$.
+    * **Action:** We must *not* use all these features. We will select one representative from each group.
 
 2.  **Key Predictors (How they combine):**
+    * **`humidity` (Negative):** The strongest driver. As humidity goes up (mùa mưa), temperature goes down. The scatter plot (`scatter_temp_vs_humidity.png`) shows a clear negative trend ($r \approx -0.82$).
+    * **`solarradiation` (Positive):** As solar radiation increases (mùa khô, trời nắng), temperature increases. Plot `scatter_temp_vs_solar.png` ($r \approx +0.70$).
+    * **`precip` (Negative):** Hot days (>30°C) almost never have rain, while high-rainfall days are almost always cooler.
 
-      * **`humidity` (Negative):** The strongest driver. As humidity goes up, temperature goes down. The scatter plot shows a clear negative trend ($r \approx -0.82$).
-      * **`solarradiation` (Positive):** As solar radiation increases, temperature increases.
-      * **`precip` (Negative):** Hot days (\>30°C) almost never have rain, while high-rainfall days are almost always cooler.
-
-**Conclusion:** The EDA tells us that temperature is driven by a combination of **strong seasonality** (time of year) and a physical battle between **solar radiation** (heating) and **humidity/rain** (cooling).
+**Conclusion:** The EDA tells us that HCMC's temperature is driven by a combination of **strong (2-season) seasonality** (time of year) and a physical battle between **solar radiation** (heating) and **humidity/rain** (cooling).
 
 -----
 
