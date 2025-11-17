@@ -182,7 +182,7 @@ The dataset has 33 features. While most are self-explanatory (e.g., `temp`, `hum
 
 We plotted the target column, `temp` (Average Daily Temperature), over the 10-year period.
 
-![alt text](daily\plots\daily_temp_timeseries.png)
+![alt text](daily/plots/daily_temp_timeseries.png)
 
 **Observations:**
 
@@ -474,5 +474,6 @@ This chart shows how much of the temperature's variance the model can explain. *
 -----
 
 ## 10\. Step 9: Deployment with ONNX
+
 
 The final step, currently in progress, is to study ONNX (Open Neural Network Exchange). The goal is to convert our 7 trained `scikit-learn` models (saved as `.pkl` files) into the `.onnx` format. This will optimize them for high-speed inference and make them platform-independent, allowing them to be deployed on any server, edge device, or web service, regardless of the original Python environment.
