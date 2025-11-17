@@ -198,7 +198,34 @@ st.markdown(f"""
         padding: 1rem 1.5rem;
         border-left: 4px solid rgba(33,150,243,0.7);
         border-radius: 10px;
-        margin: 1rem 0;
+            /* --- TAB 4 (MODEL DETAILS) HIGH-CONTRAST THEME --- */
+            div[data-baseweb="tab-panel"]:nth-of-type(4) {{
+                color: #f5f9ff;
+                background: linear-gradient(135deg, rgba(8,12,28,0.88), rgba(23,40,72,0.78));
+                border-radius: 22px;
+                padding: 1.5rem 2rem;
+                border: 1px solid rgba(255,255,255,0.08);
+                box-shadow: 0 28px 60px rgba(0,0,0,0.35);
+            }}
+            div[data-baseweb="tab-panel"]:nth-of-type(4) h1,
+                color: #f5f9ff;
+            div[data-baseweb="tab-panel"]:nth-of-type(4) li,
+            div[data-baseweb="tab-panel"]:nth-of-type(4) span,
+            div[data-baseweb="tab-panel"]:nth-of-type(4) label {{
+                color: #f5f9ff !important;
+                text-shadow: 0 0 8px rgba(0,0,0,0.55);
+            }}
+            div[data-baseweb="tab-panel"]:nth-of-type(4) [data-testid="stDataFrame"] {{
+                background: rgba(10, 18, 35, 0.85);
+                border: 1px solid rgba(255,255,255,0.18);
+                border-radius: 14px;
+                box-shadow: 0 18px 35px rgba(0,0,0,0.45);
+                color: #f5f9ff !important;
+                text-shadow: 0 0 8px rgba(0,0,0,0.55);
+                font-weight: 600;
+                color: #f5f9ff !important;
+            }}
+            /* <<< SỬA ĐỔI: LÀM TRONG SUỐT SIDEBAR >>> */
         color: {card_text_color};
     }}
     .weather-hero {{
@@ -522,11 +549,13 @@ with tab1:
             st.markdown("### 📈 Forecast Timeline")
             dates = [last_actual_date] + [forecast_dates[t] for t in filtered_targets]
             temps = [last_actual_temp] + [forecasts[t] for t in filtered_targets]
+            # Round temperatures to 0.1°C so equal displayed values plot as flat
+            temps_plot = [round(float(x), 1) if pd.notna(x) else np.nan for x in temps]
             fig, ax = plt.subplots(figsize=(12, 6))
-            ax.plot([dates[0]], [temps[0]], 'o', markersize=12, color='black', label='Latest Known', zorder=5)
-            ax.plot(dates, temps, 'o-', linewidth=2.5, markersize=10, color='#FF6B6B', label='Forecast')
-            for date, temp in zip(dates, temps):
-                ax.annotate(f'{temp:.1f}°C', xy=(date, temp), xytext=(0, 10), textcoords='offset points',
+            ax.plot([dates[0]], [temps_plot[0]], 'o', markersize=12, color='black', label='Latest Known', zorder=5)
+            ax.plot(dates, temps_plot, 'o-', linewidth=2.5, markersize=10, color='#FF6B6B', label='Forecast')
+            for date, temp_v in zip(dates, temps_plot):
+                ax.annotate(f'{temp_v:.1f}°C', xy=(date, temp_v), xytext=(0, 10), textcoords='offset points',
                             ha='center', fontsize=10, fontweight='bold',
                             bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7))
             ax.set_xlabel('Date', fontsize=12, fontweight='bold')
