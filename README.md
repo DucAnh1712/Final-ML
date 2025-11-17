@@ -139,15 +139,6 @@ Follow these steps in order. Each script processes data and saves its output, wh
     python daily/src/inference.py
     ```
 
-7.  **Visualize Final Results:**
-    (Tùy chọn) Script này đọc các tệp metrics từ bước 6 và tạo các biểu đồ so sánh (ví dụ: `rmse_by_horizon.png`) để đánh giá trực quan hiệu suất của mô hình.
-
-    ```bash
-    python daily/src/visualize_results.py 
-    ```
-
-    *(Lưu ý: Đảm bảo bạn có tệp `visualize_results.py` này trong thư mục `src`)*
-
 
 ### 3.3. Running the Application & Optimization
 
@@ -191,7 +182,7 @@ The dataset has 33 features. While most are self-explanatory (e.g., `temp`, `hum
 
 We plotted the target column, `temp` (Average Daily Temperature), over the 10-year period.
 
-![alt text](image.png)
+![alt text](daily\plots\daily_temp_timeseries.png)
 
 **Observations:**
 
@@ -200,7 +191,7 @@ We plotted the target column, `temp` (Average Daily Temperature), over the 10-ye
 
 We also plotted the average annual temperature to check for a long-term trend.
 
-![alt text](image-1.png)
+![alt text](daily\plots\annual_avg_temp.png)
 
 This plot shows significant year-to-year variation, with a cool year in 2017 (28.1°C) and a sharp peak in 2024 (29.1°C). Overall, the data suggests a **slight warming trend** across the decade.
 
@@ -208,7 +199,7 @@ This plot shows significant year-to-year variation, with a cool year in 2017 (28
 
 Notebook cũng phân tích histogram của cột `temp` để xem phân phối của nó.
 
-![alt text](image-3.png)
+![alt text](daily\plots\temp_distribution.png)
 
 **Findings:**
 1.  **Slightly Bimodal (Hai đỉnh nhẹ):** Có hai đỉnh nhỏ, một quanh 27.5°C (Mùa mưa) và một quanh 30°C (Mùa khô).
@@ -218,7 +209,7 @@ Notebook cũng phân tích histogram của cột `temp` để xem phân phối c
 
 The data clearly shows two distinct seasons: a **Dry Season** (Dec-Apr) and a **Rainy Season** (May-Nov). We used boxplots to visualize the difference:
 
-![alt text](image-2.png)
+![alt text](daily\plots\seasonal_boxplots.png)
 
 * **Dry Season (Left):** Characterized by lower humidity, almost zero rainfall, and slightly higher average temperatures.
 * **Rainy Season (Right):** Characterized by extremely high humidity, frequent heavy rainfall, and slightly cooler, more stable temperatures.
@@ -229,7 +220,7 @@ This seasonal pattern is the most dominant feature of the dataset.
 
 Để xác nhận mối quan hệ chu kỳ này, notebook đã vẽ biểu đồ khí hậu (climograph).
 
-![alt text](image-4.png)
+![alt text](daily\plots\climograph_temp_humidity.png)
 
 **Finding:** Biểu đồ cho thấy một **mối quan hệ "vòng lặp" (looping relationship)** rõ rệt. Nó không đi theo đường thẳng, mà thay vào đó, thời tiết "di chuyển" qua các mùa: từ Nóng & Khô (quý 1) -> Nóng & Ẩm (quý 2) -> Mát & Ẩm (quý 3/4) -> và quay trở lại. Đây là bằng chứng trực quan mạnh mẽ cho thấy thời tiết là một chu kỳ.
 
@@ -237,7 +228,7 @@ This seasonal pattern is the most dominant feature of the dataset.
 
 We generated a correlation matrix (heatmap) and scatter plots to find the key drivers of temperature.
 
-![alt text](image-5.png)
+![alt text](daily\plots\correlation_heatmap.png)
 
 **Key Findings:**
 
@@ -324,15 +315,22 @@ We ran `train_linear.py` to train 7 final models (one for each day, T+1 to T+7) 
 
 We will first analyze the **T+1 model** as our "best-case" scenario, and then analyze the **general trend** across all 7 models.
 
-
-> **Bảng (`test_metrics_linear.yaml`):** Kết quả cuối cùng của 7 mô hình trên tập Test.
-
 #### 6.3.1. Best-Case Performance: The T+1 (1-Day Forecast)
 
 This model is our most accurate, as it predicts the nearest day.
 
 * **RMSE: 0.828°C**
     * **Interpretation:** This is our primary metric. On average, our model's prediction for tomorrow's temperature is wrong by only **0.828 degrees Celsius**. This is a highly accurate result.
+
+| Horizon | RMSE | MAE | R² | MAPE (%) |
+| :--- | :--- | :--- | :--- | :--- |
+| **T+1** | 0.8281 | 0.6638 | 0.7243 | 2.31% |
+| **T+2** | 1.0354 | 0.8453 | 0.5692 | 2.94% |
+| **T+3** | 1.1223 | 0.9157 | 0.4942 | 3.18% |
+| **T+4** | 1.1577 | 0.9413 | 0.4621 | 3.27% |
+| **T+5** | 1.1688 | 0.9609 | 0.4522 | 3.33% |
+| **T+6** | 1.1863 | 0.9654 | 0.4362 | 3.34% |
+| **T+7** | 1.1938 | 0.9683 | 0.4299 | 3.35% |
 
 * **R² (R-Squared): 0.724** (or 72.4%)
     * **Interpretation:** Our model is able to **explain 72.4%** of the variance (the "change") in the daily temperature.
@@ -344,20 +342,33 @@ This model is our most accurate, as it predicts the nearest day.
 
 When analyzing the models "in general", we observe a clear, logical, and expected trend as we forecast further into the future.
 
-![alt text](image-6.png)
+##### **Executive Summary of Model Performance**
 
-1.  **RMSE reasonably increase:**
+The performance of the temperature forecasting model **naturally degrades** as the **forecast horizon (T+N)** increases, evidenced by the following key findings:
+
+* **Error Increase (MAE & RMSE):** Both the Mean Absolute Error (**MAE**) and Root Mean Square Error (**RMSE**) increase steadily over time.
+    * **T+1:** Lowest error (**MAE** $\approx 0.66^{\circ}C$, **RMSE** $\approx 0.83^{\circ}C$).
+    * **T+7:** Highest error (**MAE** $\approx 0.96^{\circ}C$, **RMSE** $\approx 1.20^{\circ}C$).
+* **Fit Decrease ($R^2$):** The model's explanatory power (Test $R^2$) drops significantly from **$\approx 72\%$** at T+1 to **$\approx 43\%$** at T+7.
+* **Overfitting Gap:** A noticeable gap exists between the performance on the training set (Train) and the test set (Test) across all horizons, indicating the model shows signs of **overfitting**.
+
+2. **Detailed Analysis of Charts**
+![alt text](daily\inference_results\rmse_by_horizon.png)
+
+1.  **RMSE reasonably:**
     * **Observation:** The error (RMSE) starts at a low of **0.828°C** for the T+1 model and gradually increases to **1.206°C** for the T+7 model.
     * **Interpretation:** This is the expected behavior of any forecast. The model is naturally less certain about the weather 7 days from now compared to tomorrow.
 
-![alt text](image-7.png)
+
+![alt text](daily\inference_results\r2_by_horizon.png)
 
 2.  **R² deceases gradually:**
     * **Observation:** Conversely, the model's explanatory power (R²) starts high at **72.4%** for T+1 but degrades to **40.3%** by T+7.
     * **Interpretation:** This confirms the RMSE finding. The model is very good at "explaining" tomorrow's weather, but its ability to explain the variance a full week out is significantly weaker.
 
+
 3.  **MAPE still in low:**
-    * **Observation:** Mặc dù lỗi tăng lên, lỗi phần trăm (MAPE) vẫn cực kỳ thấp, bắt đầu từ **2.31%** và chỉ tăng lên **3.37%** vào ngày T+7.
+    * **Observation:** Mặc dù lỗi tăng lên, biểu đồ `mape_by_horizon.png` cho thấy lỗi phần trăm (MAPE) vẫn cực kỳ thấp, bắt đầu từ **2.31%** và chỉ tăng lên **3.37%** vào ngày T+7.
     * **Interpretation:** This is an excellent result. It shows that even at its "worst" (T+7), the model's forecast is, on average, only 3.37% sai lệch so với nhiệt độ thực tế.
 
 **Conclusion:** The analysis shows our system features a highly accurate short-term model (T+1) and "degrades gracefully" over the 7-day horizon. This is the exact behavior of a stable, reliable, and trustworthy forecasting system.
