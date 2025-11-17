@@ -29,11 +29,8 @@ PIPELINE_PATH = os.path.join(MODEL_DIR, PIPELINE_FILENAME)
 TARGET_DAY = config.TARGET_FORECAST_COLS[0] # Ví dụ: 'target_T+1'
 MODEL_NAME = f"{TARGET_DAY}_{config.MODEL_NAME}" # Ví dụ: 'target_T+1_model_daily'
 
-# --- SỬA LỖI ---
-# Thêm đuôi .pkl vào tệp PKL_PATH
 PKL_PATH = os.path.join(MODEL_DIR, MODEL_NAME) # <-- Đã thêm .pkl
 ONNX_PATH = os.path.join(MODEL_DIR, f"{MODEL_NAME}.onnx")
-# --- KẾT THÚC SỬA LỖI ---
 
 # Cấu hình benchmark
 N_SAMPLES = 1000  # Số lượng mẫu trong 1 lô

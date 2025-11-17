@@ -208,8 +208,7 @@ This plot shows significant year-to-year variation, with a cool year in 2017 (28
 
 Notebook cũng phân tích histogram của cột `temp` để xem phân phối của nó.
 
-
-> **Plot (`temp_distribution.png`):** Phân phối của nhiệt độ.
+![alt text](image-3.png)
 
 **Findings:**
 1.  **Slightly Bimodal (Hai đỉnh nhẹ):** Có hai đỉnh nhỏ, một quanh 27.5°C (Mùa mưa) và một quanh 30°C (Mùa khô).
@@ -230,19 +229,15 @@ This seasonal pattern is the most dominant feature of the dataset.
 
 Để xác nhận mối quan hệ chu kỳ này, notebook đã vẽ biểu đồ khí hậu (climograph).
 
-
-> **Plot (`climograph_temp_humidity.png`):** Mối quan hệ giữa Nhiệt độ và Độ ẩm.
+![alt text](image-4.png)
 
 **Finding:** Biểu đồ cho thấy một **mối quan hệ "vòng lặp" (looping relationship)** rõ rệt. Nó không đi theo đường thẳng, mà thay vào đó, thời tiết "di chuyển" qua các mùa: từ Nóng & Khô (quý 1) -> Nóng & Ẩm (quý 2) -> Mát & Ẩm (quý 3/4) -> và quay trở lại. Đây là bằng chứng trực quan mạnh mẽ cho thấy thời tiết là một chu kỳ.
 
 ### 4.4. Correlation Analysis (Answering "How they combine")
 
-The brief asks: *"Try to understand the relationship between different features... (their correlation maybe). How they can combine together to detect... temperature."*.
-
 We generated a correlation matrix (heatmap) and scatter plots to find the key drivers of temperature.
 
-
-> **Plot (`correlation_heatmap.png`):** The relationship between all 33 features.
+![alt text](image-5.png)
 
 **Key Findings:**
 
@@ -268,7 +263,7 @@ Based on our EDA findings, we built a robust pipeline to process data and engine
 
 This step, executed by `data_processing.py`, prepares the data for modeling.
 
-  * **Target Creation:** As our goal is a 7-day forecast, we create 7 separate target columns (`target_t1`...`target_t7`) by shifting the `temp` column backwards = df\_new[target\_col].shift(-h)].
+  * **Target Creation:** As our goal is a 7-day forecast, we create 7 separate target columns (`target_t1`...`target_t7`) by shifting the `temp` column backwards = df\_new[target\_col].shift(-h).
   * **Time-Aware Data Splitting:** This is the most important step to prevent data leakage. We **do not shuffle**. Instead, we split the data strictly by time:
       * **Train:** The first 70% of the data.
       * **Validation:** The next 15% of the data.
@@ -315,23 +310,57 @@ Having crowned Linear Models as our champion, we used Optuna to find the best po
 
 This 7-day gap is critical: it matches our 7-day forecast horizon, ensuring that no information from the validation period can *ever* leak into the training period, making our parameter search 100% reliable.
 
+Chào bạn, tôi đã xem xét các biểu đồ 7 ngày (by horizon) và tệp `test_metrics_linear.yaml` mà bạn cung cấp.
+
+Phân tích T+1 của bạn đã rất tốt, nhưng nó chỉ là một phần của câu chuyện. Yêu cầu của bạn là "phân tích các model nói chung", vì vậy tôi đã mở rộng phần này để phân tích *xu hướng* (trend) của 7 mô hình khi chúng dự báo xa hơn về tương lai (T+1 đến T+7).
+
+Đây là phiên bản cập nhật, kết hợp cả phân tích T+1 (là trường hợp tốt nhất) và phân tích "chung" (xu hướng 7 ngày).
+
+---
+
 ### 6.3. Final Daily Model & Metrics Interpretation
 
 We ran `train_linear.py` to train 7 final models (one for each day, T+1 to T+7) on 85% of the data. The brief asks us to "use them all [metrics], understand and interprete them".
 
-**Here is the T+1 (1-Day Forecast) Performance on Unseen Test Data:**
+We will first analyze the **T+1 model** as our "best-case" scenario, and then analyze the **general trend** across all 7 models.
 
-  * **RMSE: 0.828°C**
 
-      * **Interpretation:** This is our primary metric. On average, our model's prediction is wrong by only **0.828 degrees Celsius**. This is a highly accurate result.
+> **Bảng (`test_metrics_linear.yaml`):** Kết quả cuối cùng của 7 mô hình trên tập Test.
 
-  * **R² (R-Squared): 0.724** (or 72.4%)
+#### 6.3.1. Best-Case Performance: The T+1 (1-Day Forecast)
 
-      * **Interpretation:** Our model is able to **explain 72.4%** of the variance (the "change") in the daily temperature.
+This model is our most accurate, as it predicts the nearest day.
 
-  * **MAPE (Mean Absolute Percentage Error): 2.31%**
+* **RMSE: 0.828°C**
+    * **Interpretation:** This is our primary metric. On average, our model's prediction for tomorrow's temperature is wrong by only **0.828 degrees Celsius**. This is a highly accurate result.
 
-      * **Interpretation:** This is the easiest to explain. It means our forecast is, on average, only **2.31%** off from the actual temperature.
+* **R² (R-Squared): 0.724** (or 72.4%)
+    * **Interpretation:** Our model is able to **explain 72.4%** of the variance (the "change") in the daily temperature.
+
+* **MAPE (Mean Absolute Percentage Error): 2.31%**
+    * **Interpretation:** This is the easiest to explain. It means our forecast is, on average, only **2.31%** off from the actual temperature.
+
+#### 6.3.2. General Performance: The 7-Day Horizon Trend
+
+When analyzing the models "in general", we observe a clear, logical, and expected trend as we forecast further into the future.
+
+![alt text](image-6.png)
+
+1.  **RMSE reasonably increase:**
+    * **Observation:** The error (RMSE) starts at a low of **0.828°C** for the T+1 model and gradually increases to **1.206°C** for the T+7 model.
+    * **Interpretation:** This is the expected behavior of any forecast. The model is naturally less certain about the weather 7 days from now compared to tomorrow.
+
+![alt text](image-7.png)
+
+2.  **R² deceases gradually:**
+    * **Observation:** Conversely, the model's explanatory power (R²) starts high at **72.4%** for T+1 but degrades to **40.3%** by T+7.
+    * **Interpretation:** This confirms the RMSE finding. The model is very good at "explaining" tomorrow's weather, but its ability to explain the variance a full week out is significantly weaker.
+
+3.  **MAPE still in low:**
+    * **Observation:** Mặc dù lỗi tăng lên, lỗi phần trăm (MAPE) vẫn cực kỳ thấp, bắt đầu từ **2.31%** và chỉ tăng lên **3.37%** vào ngày T+7.
+    * **Interpretation:** This is an excellent result. It shows that even at its "worst" (T+7), the model's forecast is, on average, only 3.37% sai lệch so với nhiệt độ thực tế.
+
+**Conclusion:** The analysis shows our system features a highly accurate short-term model (T+1) and "degrades gracefully" over the 7-day horizon. This is the exact behavior of a stable, reliable, and trustworthy forecasting system.
 
 -----
 
@@ -342,8 +371,6 @@ To make our model accessible, we built a web application using Streamlit. This a
 -----
 
 ## 8\. Step 7: Retraining Strategy (When to Retrain?)
-
-The brief asks: *"if you... predict day by day... performance will downgrade. When you should retrain your model?"*.
 
 First, we must understand *why* retraining is necessary. A model may perform well today, but its performance can degrade over time. This is known as **Model Drift**.
 

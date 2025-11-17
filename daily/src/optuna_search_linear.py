@@ -1,4 +1,4 @@
-# optuna_search_linear.py (V4 - LEAKAGE-FREE WITH GAP)
+# optuna_search_linear.py
 import os
 import pandas as pd
 import numpy as np
@@ -55,7 +55,7 @@ class PurgedTimeSeriesSplit:
 
 
 # =============================================================================
-# ALIGNMENT FUNCTION (SỬA LỖI DROPNA)
+# ALIGNMENT FUNCTION
 # =============================================================================
 def align_data_for_tuning(X_raw, y_raw, pipeline, scaler, fit_transform=False):
     """
@@ -78,10 +78,6 @@ def align_data_for_tuning(X_raw, y_raw, pipeline, scaler, fit_transform=False):
     X_df = pd.DataFrame(X_scaled, index=X_feat.index, columns=X_feat.columns) 
     
     combined = pd.concat([y_df, X_df], axis=1)
-    
-    # ✅✅✅ SỬA LỖI Ở ĐÂY ✅✅✅
-    # Chỉ drop các hàng mà CỘT TARGET (y) bị NaN
-    # (Chúng ta giả định X_df đã sạch NaNs nhờ pipeline)
     combined_clean = combined.dropna(subset=[y_aligned.name]) 
     
     y_final = combined_clean[y_aligned.name]
@@ -106,10 +102,8 @@ def load_data_for_tuning(target_name):
         os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv")
     )
     
-    # 2. Gộp lại
     all_train_data = pd.concat([train_df, val_df], ignore_index=True)
     
-    # 3. Xử lý Datetime (Logic cũ của bạn, rất tốt)
     if 'datetime' not in all_train_data.columns:
          raise KeyError("❌ Không tìm thấy cột 'datetime' trong file CSV.")
     
@@ -117,12 +111,8 @@ def load_data_for_tuning(target_name):
     all_train_data['datetime'] = pd.to_datetime(all_train_data['datetime'])
     all_train_data = all_train_data.set_index('datetime', drop=False)
 
-    # 4. Sắp xếp lại (Quan trọng cho CV)
     all_train_data = all_train_data.sort_index()
 
-    # 5. ✅✅✅ SỬA LỖI QUAN TRỌNG NHẤT ✅✅✅
-    # Xóa bất kỳ hàng nào có giá trị NaN trong cột target
-    # (do lỗi từ file Excel gốc)
     rows_before = len(all_train_data)
     all_train_data = all_train_data.dropna(subset=[target_name])
     rows_after = len(all_train_data)

@@ -19,10 +19,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-# Tự động tải lại trang sau mỗi 10 phút (600,000 ms)
 st_autorefresh(interval=600000, key="theme_refresher")
-# ======================================================
-# <<< KHỐI CSS NÂNG CẤP VỚI MÂY VÀ SAO (PHIÊN BẢN 3.0) >>>
 # ======================================================
 current_dt = datetime.now()
 current_hour = current_dt.hour

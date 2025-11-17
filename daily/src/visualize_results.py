@@ -42,7 +42,6 @@ def load_metrics_to_dataframe():
     df = df_train.join(df_test, lsuffix='_train', rsuffix='_test')
 
     # 6. Create Horizon column (1, 2, 3... 7) for plotting
-    # ✅ SỬA: Xử lý cả 't1' (daily) và 't24' (hourly)
     horizon_values = df.index.str.replace('target_t', '').astype(int)
     if horizon_values.max() > 20: # Giả định là hourly
         df['Horizon'] = horizon_values / 24
@@ -170,7 +169,7 @@ def main():
         plot_overfitting_gap(df_metrics) # <-- GỌI HÀM MỚI
         
         print("\n🎉 VISUALIZATION COMPLETE!")
-        print(f"See the 4 .png files in: {config.OUTPUT_DIR}") # <-- Sửa số lượng
+        print(f"See the 4 .png files in: {config.OUTPUT_DIR}") 
 
 if __name__ == "__main__":
     try:

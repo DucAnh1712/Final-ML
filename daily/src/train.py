@@ -13,7 +13,6 @@ import config
 from feature_engineering import create_feature_pipeline
 
 def load_optuna_best_params():
-    # ... (không thay đổi)
     params_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_YAML)
     if not os.path.exists(params_path):
         raise FileNotFoundError(
@@ -26,7 +25,6 @@ def load_optuna_best_params():
     return data['best_params']
 
 def align_data_final(X_feat_scaled_df, y_raw_series):
-    # ... (không thay đổi)
     y_aligned = y_raw_series.copy()
     y_aligned.index = X_feat_scaled_df.index 
     y_df = pd.DataFrame(y_aligned)
@@ -37,7 +35,6 @@ def align_data_final(X_feat_scaled_df, y_raw_series):
     return X_final, y_final
 
 def create_model_from_params(params):
-    # ... (không thay đổi)
     model_type = params.get('model_type', 'LinearRegression')
     alpha = params.get('alpha', 1.0)
     l1_ratio = params.get('l1_ratio', 0.5)

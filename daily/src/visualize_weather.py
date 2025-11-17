@@ -108,6 +108,31 @@ def plot_correlation_heatmap(df):
     plt.yticks(rotation=0)
     save_plot(fig, "correlation_heatmap.png", dpi=150)
 
+def plot_temperature_distribution(df):
+    """Visualizes the distribution of the average daily temperature."""
+    print("Plotting: Temperature distribution histogram...")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Sử dụng histplot của seaborn để có biểu đồ đẹp hơn, kèm đường KDE
+    sns.histplot(df['temp'], bins=30, kde=True, ax=ax, color='#3498db', edgecolor='white')
+    
+    # Lấy đường KDE từ ax và tô màu đậm hơn
+    line = ax.lines[0]
+    line.set_color('#2980b9')
+    line.set_linewidth(2.5)
+
+    ax.set_title('Distribution of Average Daily Temperature (2015-2025)', fontsize=16, fontweight="bold")
+    ax.set_xlabel('Temperature (°C)', fontsize=12)
+    ax.set_ylabel('Frequency (Days)', fontsize=12)
+    ax.grid(True, linestyle='--', alpha=0.6)
+    
+    # Thêm đường vạch cho giá trị trung bình
+    mean_temp = df['temp'].mean()
+    ax.axvline(mean_temp, color='red', linestyle='--', linewidth=2, label=f'Mean: {mean_temp:.2f}°C')
+    ax.legend()
+    
+    save_plot(fig, "temp_distribution.png")
+
 def plot_scatter_relationships(df):
     """Plots scatter plots showing relationships."""
     
@@ -273,6 +298,7 @@ def main():
     plot_monthly_temperature(df)
     plot_annual_temperature(df)
     plot_seasonal_comparison(df)
+    plot_temperature_distribution(df)
     plot_correlation_heatmap(df)
     plot_scatter_relationships(df)
     plot_seasonal_boxplots(df)
