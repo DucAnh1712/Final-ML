@@ -3,6 +3,8 @@
   * **Team:** Group 6
   * **Subject:** Subject 2: Saigon Temperature Forecasting
 
+* **Project Framework:** This MLOps pipeline is developed entirely in Python, utilizing key libraries such as **Scikit-learn** for modeling, **Optuna** for hyperparameter tuning, and **Streamlit** for the deployment interface.
+
 -----
 
 ## 1\. Project Objective (Step 1: Data Acquisition)
@@ -10,6 +12,7 @@
 The core objective of this project is to build a complete Machine Learning system capable of forecasting the average daily temperature in Ho Chi Minh City (Saigon) for the **next 7 days** ($T+1$ to $T+7$).
 
 To achieve this, we began by collecting **over 10 years** of historical daily weather data, specifically from **January 1, 2015, to October 8, 2025**, from Visual Crossing. This resulted in a raw dataset of **3,934 entries** and **33 features**.
+
 -----
 
 ## 2\. Project Structure
@@ -572,6 +575,7 @@ The benchmark comparing the native Scikit-learn model with the converted ONNX mo
 | **Sklearn (CPU)** | **$0.9892 \text{ ms}$** | $1.0000$ | Baseline performance of the native Python model. |
 | **ONNX (GPU)** | $0.0389 \text{ ms}$ | $\approx 25.4$x | GPU acceleration is comparable to CPU, likely due to the small model size not justifying the overhead of data transfer to the GPU. |
 | **ONNX (CPU)** | **$0.0383 \text{ ms}$** | **$\approx 25.8$x** | **Fastest performance!** Demonstrates the power of ONNX Runtime's optimization on the CPU, overcoming Python/Scikit-learn bottlenecks. |
+
 
 
 **Conclusion:** Converting our Scikit-learn models to ONNX and utilizing the ONNX Runtime resulted in an astonishing **$\approx 25.8$ times speed increase** in inference time compared to the native Python implementation. This ensures the forecasting system can handle hourly prediction requests with extremely low latency in a production environment.
