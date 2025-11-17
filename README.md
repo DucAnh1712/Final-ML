@@ -266,9 +266,7 @@ This step, executed by `data_processing.py`, prepares the data for modeling.
       * **Validation:** The next 15% of the data.
       * **Test:** The final 15% of the data.
   * **Handle Missing Values:** The script handles missing data (like `preciptype` and `severerisk`) by filling them, and the final `ColumnPreprocessor` handles any remaining NaNs using `ffill`/`bfill`.
-
-Chắc chắn rồi! Dưới đây là phần **5.2. Feature Engineering (Step 4)** đã được sửa đổi và làm rõ chi tiết, được định dạng hoàn toàn bằng Markdown để bạn đưa vào báo cáo:
-
+    
 ---
 
 ### 5.2. Feature Engineering (Step 4)
@@ -585,6 +583,7 @@ The benchmark comparing the native Scikit-learn model with the converted ONNX mo
 
 
 **Conclusion:** Converting our Scikit-learn models to ONNX and utilizing the ONNX Runtime resulted in an astonishing **$\approx 25.8$ times speed increase** in inference time compared to the native Python implementation. This ensures the forecasting system can handle hourly prediction requests with extremely low latency in a production environment.
+
 
 
 
