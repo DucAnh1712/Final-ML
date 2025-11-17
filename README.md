@@ -571,11 +571,12 @@ The benchmark comparing the native Scikit-learn model with the converted ONNX mo
 | Method | Time\_ms\_per\_batch | Speedup\_vs\_Sklearn | Analysis |
 | :--- | :--- | :--- | :--- |
 | **Sklearn (CPU)** | **$0.9892 \text{ ms}$** | $1.0000$ | Baseline performance of the native Python model. |
-| **ONNX (GPU)** | $0.0389 \text{ ms}$ | $\approx 25.4$x | GPU acceleration is comparable to CPU, likely due to the small model size not justifying the overhead of data transfer to the GPU. |
-| **ONNX (CPU)** | **$0.0383 \text{ ms}$** | **$\approx 25.8$x** | **Fastest performance!** Demonstrates the power of ONNX Runtime's optimization on the CPU, overcoming Python/Scikit-learn bottlenecks. |
+| **ONNX (GPU)** | $0.0389 \text{ ms}$ | $\approx 25.4\text{x}$ | GPU acceleration is comparable to CPU, likely due to the small model size not justifying the overhead of data transfer to the GPU. |
+| **ONNX (CPU)** | **$0.0383 \text{ ms}$** | **$\approx 25.8\text{x}$** | **Fastest performance!** Demonstrates the power of ONNX Runtime's optimization on the CPU, overcoming Python/Scikit-learn bottlenecks. |
 
 
 
 **Conclusion:** Converting our Scikit-learn models to ONNX and utilizing the ONNX Runtime resulted in an astonishing **$\approx 25.8$ times speed increase** in inference time compared to the native Python implementation. This ensures the forecasting system can handle hourly prediction requests with extremely low latency in a production environment.
+
 
 
