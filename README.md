@@ -191,7 +191,7 @@ We plotted the target column, `temp` (Average Daily Temperature), over the 10-ye
 
 We also plotted the average annual temperature to check for a long-term trend.
 
-![alt text](daily\plots\annual_avg_temp.png)
+![alt text](daily/plots/annual_avg_temp.png)
 
 This plot shows significant year-to-year variation, with a cool year in 2017 (28.1°C) and a sharp peak in 2024 (29.1°C). Overall, the data suggests a **slight warming trend** across the decade.
 
@@ -199,7 +199,7 @@ This plot shows significant year-to-year variation, with a cool year in 2017 (28
 
 Notebook cũng phân tích histogram của cột `temp` để xem phân phối của nó.
 
-![alt text](daily\plots\temp_distribution.png)
+![alt text](daily/plots/temp_distribution.png)
 
 **Findings:**
 1.  **Slightly Bimodal (Hai đỉnh nhẹ):** Có hai đỉnh nhỏ, một quanh 27.5°C (Mùa mưa) và một quanh 30°C (Mùa khô).
@@ -209,7 +209,7 @@ Notebook cũng phân tích histogram của cột `temp` để xem phân phối c
 
 The data clearly shows two distinct seasons: a **Dry Season** (Dec-Apr) and a **Rainy Season** (May-Nov). We used boxplots to visualize the difference:
 
-![alt text](daily\plots\seasonal_boxplots.png)
+![alt text](daily/plots/seasonal_boxplots.png)
 
 * **Dry Season (Left):** Characterized by lower humidity, almost zero rainfall, and slightly higher average temperatures.
 * **Rainy Season (Right):** Characterized by extremely high humidity, frequent heavy rainfall, and slightly cooler, more stable temperatures.
@@ -220,7 +220,7 @@ This seasonal pattern is the most dominant feature of the dataset.
 
 Để xác nhận mối quan hệ chu kỳ này, notebook đã vẽ biểu đồ khí hậu (climograph).
 
-![alt text](daily\plots\climograph_temp_humidity.png)
+![alt text](daily/plots/climograph_temp_humidity.png)
 
 **Finding:** Biểu đồ cho thấy một **mối quan hệ "vòng lặp" (looping relationship)** rõ rệt. Nó không đi theo đường thẳng, mà thay vào đó, thời tiết "di chuyển" qua các mùa: từ Nóng & Khô (quý 1) -> Nóng & Ẩm (quý 2) -> Mát & Ẩm (quý 3/4) -> và quay trở lại. Đây là bằng chứng trực quan mạnh mẽ cho thấy thời tiết là một chu kỳ.
 
@@ -228,7 +228,7 @@ This seasonal pattern is the most dominant feature of the dataset.
 
 We generated a correlation matrix (heatmap) and scatter plots to find the key drivers of temperature.
 
-![alt text](daily\plots\correlation_heatmap.png)
+![alt text](daily/plots/correlation_heatmap.png)
 
 **Key Findings:**
 
@@ -352,26 +352,52 @@ The performance of the temperature forecasting model **naturally degrades** as t
 * **Fit Decrease ($R^2$):** The model's explanatory power (Test $R^2$) drops significantly from **$\approx 72\%$** at T+1 to **$\approx 43\%$** at T+7.
 * **Overfitting Gap:** A noticeable gap exists between the performance on the training set (Train) and the test set (Test) across all horizons, indicating the model shows signs of **overfitting**.
 
-2. **Detailed Analysis of Charts**
-![alt text](daily\inference_results\rmse_by_horizon.png)
+##### **Detailed Analysis of Charts**
 
-1.  **RMSE reasonably:**
-    * **Observation:** The error (RMSE) starts at a low of **0.828°C** for the T+1 model and gradually increases to **1.206°C** for the T+7 model.
-    * **Interpretation:** This is the expected behavior of any forecast. The model is naturally less certain about the weather 7 days from now compared to tomorrow.
+1. Model Performance (MAE & RMSE)
+![alt text](daily/inference_results/mae_by_horizon.png)
+![alt text](daily/inference_results/rmse_by_horizon.png)
 
+| Metric | T+1 (Best) | T+7 (Worst) | Interpretation |
+| :--- | :--- | :--- | :--- |
+| **Test MAE** | $\approx 0.66^{\circ}C$ | $\approx 0.96^{\circ}C$ | The average forecast error increases by **$\approx 45\%$** when forecasting 6 days further out. |
+| **Test RMSE** | $\approx 0.83^{\circ}C$ | $\approx 1.20^{\circ}C$ | Error increases, indicating a rise in larger errors (as RMSE penalizes large errors more severely than MAE). |
 
-![alt text](daily\inference_results\r2_by_horizon.png)
+**Observation:** The error curve (orange line) is steepest from **T+1 to T+3**. After this point, the error continues to rise but at a slower rate (the curve begins to flatten).
 
-2.  **R² deceases gradually:**
-    * **Observation:** Conversely, the model's explanatory power (R²) starts high at **72.4%** for T+1 but degrades to **40.3%** by T+7.
-    * **Interpretation:** This confirms the RMSE finding. The model is very good at "explaining" tomorrow's weather, but its ability to explain the variance a full week out is significantly weaker.
+2. Model Fit ($R^2$)
+![alt text](daily/inference_results/r2_by_horizon.png)
 
+| Forecast Day | Train $R^2$ | Test $R^2$ |
+| :--- | :--- | :--- |
+| **T+1** | $\approx 0.67$ | $\approx 0.72$ |
+| **T+4** | $\approx 0.40$ | $\approx 0.46$ |
+| **T+7** | $\approx 0.33$ | $\approx 0.43$ |
 
-3.  **MAPE still in low:**
-    * **Observation:** Mặc dù lỗi tăng lên, biểu đồ `mape_by_horizon.png` cho thấy lỗi phần trăm (MAPE) vẫn cực kỳ thấp, bắt đầu từ **2.31%** và chỉ tăng lên **3.37%** vào ngày T+7.
-    * **Interpretation:** This is an excellent result. It shows that even at its "worst" (T+7), the model's forecast is, on average, only 3.37% sai lệch so với nhiệt độ thực tế.
+**Observation:**
+* The Test $R^2$ is **higher** than the Train $R^2$ at T+1, which is **unusual** in regression analysis and may be due to differences in the distribution or complexity between the 85% training data and the 15% test data.
+* The Test $R^2$ **drops sharply** from T+1 to T+4 (from $72\%$ to $46\%$), confirming that the model's predictive capability significantly diminishes after just 4 days.
 
-**Conclusion:** The analysis shows our system features a highly accurate short-term model (T+1) and "degrades gracefully" over the 7-day horizon. This is the exact behavior of a stable, reliable, and trustworthy forecasting system.
+3. Model Overfitting (Train-Test RMSE Gap)
+![alt text](daily/inference_results/overfitting_gap_by_horizon.png)
+
+This chart assesses the difference (as a percentage) between the RMSE on the Test set and the RMSE on the Train set:
+
+| Forecast Day | Overfitting Gap (%) | Interpretation |
+| :--- | :--- | :--- |
+| **T+1** | $\approx 7.5\%$ | Lowest level of overfitting. |
+| **T+4** | **$\approx 11.8\%$** | **Highest** level of overfitting observed. |
+| **T+7** | $\approx 8.2\%$ | The level of overfitting slightly decreases. |
+
+**Observation:**
+* The Overfitting Gap **peaks** on **T+4**, suggesting the model is most over-fitted to the training data for this medium-range forecast horizon.
+* The existence of a positive **Overfitting Gap** across all horizons confirms the model cannot perfectly generalize its performance from the training data to unseen (Test) data.
+
+##### **Overall Conclusion**
+
+The model performs **best** for **short-term forecasts (T+1 to T+2)** with high accuracy (MAE $\leq 0.75^{\circ}C$, $R^2 \geq 57\%$).
+
+However, it exhibits a **rapid decline** in performance and a **significant degree of overfitting** as the forecast extends further out. Specifically, after T+4, although the error continues to rise, the reliability ($R^2$) is only about $45\%$, indicating this is the **practical limit** of this model's useful range.
 
 -----
 
@@ -420,7 +446,7 @@ We will combine both methods for a robust system:
 
 ## 9\. Step 8: The Hourly Data Experiment
 
-The brief asks: *"with hourly data... can you do better?"*. We re-ran the *entire* MLOps pipeline using the **Hourly Data**. This dataset is much larger (24x) and contains more high-frequency noise.
+We re-ran the *entire* MLOps pipeline using the **Hourly Data**. This dataset is much larger (24x) and contains more high-frequency noise.
 
 ### 9.1. The Hourly Benchmark (A Different Story)
 
@@ -441,28 +467,57 @@ Unlike the Daily data (where Linear models won), the initial benchmark on Hourly
 
 After running all three models through our `optuna_search` pipeline, we compared their final, tuned performance on the Test set.
 
-#### A. Absolute Accuracy (Test RMSE)
+#### Executive Summary   
+The analysis yields a consistent conclusion across all key metrics:
+
+* The **Linear Model** is the **least effective** across all forecast horizons.
+* **LightGBM** and **XGBoost** (tree-based models) show **superior and highly competitive performance**.
+* **XGBoost** emerges as the overall **best performer** for long-term stability and accuracy (T+7).
+
+1. Absolute Accuracy Comparison (Test MAE and Test RMSE)
 
 This chart compares the average prediction error (RMSE) for the 7-day forecast. **Lower is better.**
 
-*Plot `image_e3bdc2.png`: Test RMSE comparison of the three tuned models.*
+![alt text](hourly/inference_results/compare_ALL_MODELS_Test_RMSE.png)
+![alt text](hourly/inference_results/compare_ALL_MODELS_Test_MAE.png)
 
-**Findings:**
+These metrics measure the average temperature prediction error. **Lower values are better.**
 
-1.  **Linear Model:** The (blue) line shows the Linear model is **the least accurate** at every single forecast horizon (T+1 RMSE \~1.51°C).
-2.  **Tree Models:** Both **LightGBM (green)** and **XGBoost (orange)** are significantly more accurate, starting with an RMSE of \~1.48°C.
-3.  **LGBM vs. XGB:** A close look shows **LightGBM is the winner for short-term forecasts** (Days 1-6), while **XGBoost pulls ahead slightly for the long-term** (Day 7).
+| Metric | T+1 (Short-term) | T+7 (Long-term) | Key Finding |
+| :--- | :--- | :--- | :--- |
+| **Linear MAE** | $\approx 1.135^{\circ}C$ | $\approx 1.315^{\circ}C$ | Highest error across the board. |
+| **LGBM RMSE** | $\approx 1.48^{\circ}C$ | $\approx 1.64^{\circ}C$ | Best accuracy for the very short-term (T+1). |
+| **XGBoost RMSE** | $\approx 1.485^{\circ}C$ | **$\approx 1.62^{\circ}C$** | **Best accuracy for the long-term (T+7)**, showing the lowest error. |
 
-#### B. Model Fit (Test R²)
+**Conclusion:** For practical forecasting, **XGBoost** is the best choice for the entire week, exhibiting the lowest error at the crucial T+7 horizon.
 
-This chart shows how much of the temperature's variance the model can explain. **Higher is better.**
+2. Model Fit (Test R²)
 
-*Plot `image_e3bb1c.png`: Test R² (R-Squared) comparison.*
+This metric measures the model's ability to explain the variance in temperature. **Higher values are better** and a flatter line indicates better stability.
 
-**Findings:**
+![alt text](hourly/inference_results/compare_ALL_MODELS_Test_R2.png)
 
-  * This plot confirms the RMSE results. The **Linear** model's R² (blue line) drops significantly over time, falling to \~67% by Day 7.
-  * Both **XGBoost and LightGBM** are far more stable, maintaining a high R² of **over 70%** even at 7 days out. This proves they are better at modeling the complex, non-linear patterns in the hourly data.
+| Model | T+1 ($R^2$) | T+7 ($R^2$) | Stability Drop (T+1 to T+7) |
+| :--- | :--- | :--- | :--- |
+| **Linear** | $\approx 0.743$ | $\approx 0.67$ | **Sharpest decline (loss of $\approx 7.3$ points)**. |
+| **LightGBM** | $\approx 0.755$ | $\approx 0.70$ | Maintains stability, dropping to $70\%$. |
+| **XGBoost** | $\approx 0.75$ | **$\approx 0.705$** | **Highest $R^2$ at T+7**, demonstrating superior long-term stability. |
+
+**Conclusion:** Both tree models maintain an $R^2$ of over $70\%$ at T+7, proving their robustness in modeling complex, non-linear hourly data. **XGBoost** is marginally more stable in the long run.
+
+3. Overfitting Analysis (Train-Test RMSE Gap)
+
+![alt text](hourly/inference_results/compare_ALL_MODELS_Overfitting_Gap.png)
+
+This metric compares performance on the training and test sets. **Lower values are better**, indicating better generalization.
+
+| Model | T+2 (Peak Overfitting) | T+7 (Generalization) | Overfitting Insight |
+| :--- | :--- | :--- | :--- |
+| **Linear** | $\approx 4.5\%$ | $\approx 3.5\%$ | **Lowest overall overfitting**, suggesting the best generalization ability despite the low accuracy. |
+| **LightGBM** | **$\approx 10.5\%$** | $\approx 5.7\%$ | High initial overfitting, but the gap narrows significantly. |
+| **XGBoost** | $\approx 10.5\%$ | **$\approx 4.8\%$** | High initial overfitting, but the gap reduces to the lowest among tree models at T+7. |
+
+**Conclusion:** The **Linear Model** has the best generalization, but the high **accuracy** of the tree models justifies their higher overfitting gap. **XGBoost** manages to reduce its overfitting gap more effectively than LightGBM in the long term.
 
 ### 9.3. Final Conclusion (Step 8)
 
@@ -473,7 +528,48 @@ This chart shows how much of the temperature's variance the model can explain. *
 
 -----
 
-## 10\. Step 9: Deployment with ONNX
+## 🚀 10. Step 9: Deployment with ONNX
+
+The final step involves optimizing our models for production deployment using ONNX (Open Neural Network Exchange). The goal is to convert our 7 trained Scikit-learn models from `.pkl` format to the optimized `.onnx` format.
+
+### 10.1. Understanding ONNX and Its Value
+
+#### A. What is ONNX?
+
+**ONNX (Open Neural Network Exchange)** is an **open format** designed to represent machine learning models. It acts as an **interchange language**, allowing models trained in one framework (like Scikit-learn, PyTorch, or TensorFlow) to be converted and run efficiently on different platforms and devices (e.g., servers, edge devices, web services) using a highly optimized inference engine like ONNX Runtime.
+
+#### B. Why Use ONNX for Deployment Efficiency?
+
+ONNX should be used when maximizing **deployment efficiency** is critical:
+
+1.  **Inference Speed (Low Latency):** Essential for applications requiring real-time, high-volume data processing.
+2.  **Cross-Platform Compatibility:** Allows models to be deployed uniformly across various environments (e.g., Linux, Windows, Android) regardless of the original training setup.
+3.  **Hardware Acceleration:** Enables seamless utilization of specialized hardware accelerators (GPU, FPGAs) via ONNX Runtime without custom code changes for each hardware type.
+4.  **Model Optimization:** The ONNX Runtime can perform graph optimizations (e.g., node fusion) to further enhance computational efficiency.
+
+---
+
+### 10.2. Applying ONNX to Scikit-learn Models
+
+In this project, we have 7 small Scikit-learn models (one for each forecast day) that are called frequently. Optimizing their inference speed is crucial, especially for an hourly forecasting system.
+
+#### A. Rationale for Converting Scikit-learn to ONNX
+
+Standard Scikit-learn inference is often hindered by the **Python Global Interpreter Lock (GIL)**. Converting the models to ONNX and using the **ONNX Runtime (ORT)**—which is written in high-performance C/C++—provides significant benefits:
+
+* **Bypassing Python GIL:** ORT frees the model from Python's performance bottlenecks.
+* **Leveraging Optimized Backends:** ORT utilizes highly efficient mathematical libraries and hardware-specific optimizations (like MKL or CUDA).
+* **Simplified Deployment:** Ensures a consistent, fast, and dependency-light inference mechanism across production environments.
+
+#### B. Final Inference Benchmark Results 🏆
+
+The benchmark comparing the native Scikit-learn model with the converted ONNX model validates this approach:
+
+| Method | Time\_ms\_per\_batch | Speedup\_vs\_Sklearn | Analysis |
+| :--- | :--- | :--- | :--- |
+| **Sklearn (CPU)** | **$0.9892 \text{ ms}$** | $1.0000$ | Baseline performance of the native Python model. |
+| **ONNX (GPU)** | $0.0389 \text{ ms}$ | $\approx 25.4$x | GPU acceleration is comparable to CPU, likely due to the small model size not justifying the overhead of data transfer to the GPU. |
+| **ONNX (CPU)** | **$0.0383 \text{ ms}$** | **$\approx 25.8$x** | **Fastest performance!** Demonstrates the power of ONNX Runtime's optimization on the CPU, overcoming Python/Scikit-learn bottlenecks. |
 
 
-The final step, currently in progress, is to study ONNX (Open Neural Network Exchange). The goal is to convert our 7 trained `scikit-learn` models (saved as `.pkl` files) into the `.onnx` format. This will optimize them for high-speed inference and make them platform-independent, allowing them to be deployed on any server, edge device, or web service, regardless of the original Python environment.
+**Conclusion:** Converting our Scikit-learn models to ONNX and utilizing the ONNX Runtime resulted in an astonishing **$\approx 25.8$ times speed increase** in inference time compared to the native Python implementation. This ensures the forecasting system can handle hourly prediction requests with extremely low latency in a production environment.
