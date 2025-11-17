@@ -5,6 +5,7 @@ import numpy as np
 import joblib
 import yaml
 from sklearn.preprocessing import RobustScaler
+from sklearn.pipeline import Pipeline  # <--- THÊM VÀO
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from clearml import Task 
@@ -12,6 +13,7 @@ import config
 from feature_engineering import create_feature_pipeline
 
 def load_optuna_best_params():
+    # ... (không thay đổi)
     params_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_YAML)
     if not os.path.exists(params_path):
         raise FileNotFoundError(
@@ -24,9 +26,7 @@ def load_optuna_best_params():
     return data['best_params']
 
 def align_data_final(X_feat_scaled_df, y_raw_series):
-    """
-    Simple align function: Just join and dropna
-    """
+    # ... (không thay đổi)
     y_aligned = y_raw_series.copy()
     y_aligned.index = X_feat_scaled_df.index 
     y_df = pd.DataFrame(y_aligned)
@@ -37,6 +37,7 @@ def align_data_final(X_feat_scaled_df, y_raw_series):
     return X_final, y_final
 
 def create_model_from_params(params):
+    # ... (không thay đổi)
     model_type = params.get('model_type', 'LinearRegression')
     alpha = params.get('alpha', 1.0)
     l1_ratio = params.get('l1_ratio', 0.5)
@@ -94,10 +95,37 @@ def main():
     X_feat_full_clean = X_feat_full.dropna() 
     scaler.fit(X_feat_full_clean)
     
+    # Lưu các file riêng lẻ (giữ nguyên)
     joblib.dump(feature_pipeline, os.path.join(config.MODEL_DIR, config.PIPELINE_NAME))
     joblib.dump(scaler, os.path.join(config.MODEL_DIR, config.SCALER_NAME))
     print(f"💾 Feature Pipeline saved to: {config.PIPELINE_NAME}")
     print(f"💾 Scaler saved to: {config.SCALER_NAME}")
+
+    # ======================================================
+    # 2.5. THÊM VÀO: TẠO VÀ LƯU PIPELINE CHO ONNX
+    # ======================================================
+    print("\n" + "-"*50)
+    print("Creating ONNX-convertible preprocessing pipeline...")
+    
+    # Gộp feature_pipeline VÀ scaler (cả 2 đều đã được fit)
+    onnx_preprocessing_pipeline = Pipeline([
+        ('feature_engineering', feature_pipeline),
+        ('scaler', scaler)
+    ])
+    
+    # Đây là tên tệp mà 'convert_to_onnx.py' đang tìm kiếm
+    onnx_pipeline_filename = 'onnx_convertible_pipeline.pkl'
+    onnx_pipeline_path = os.path.join(config.MODEL_DIR, onnx_pipeline_filename)
+    
+    joblib.dump(onnx_preprocessing_pipeline, onnx_pipeline_path)
+    
+    print(f"✅ Preprocessing pipeline for ONNX (Features + Scaler) saved to:")
+    print(f"   {onnx_pipeline_path}")
+    print("-"*50 + "\n")
+    # ======================================================
+    # KẾT THÚC PHẦN THÊM VÀO
+    # ======================================================
+
 
     # ======================================================
     # 3. LOOP AND TRAIN EACH MODEL

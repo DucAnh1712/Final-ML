@@ -1,0 +1,9 @@
+- Method: ONNX (CPU)
+  Time_ms_per_batch: 0.03833399969153106
+  Speedup_vs_Sklearn: 25.80445578478684
+- Method: ONNX (GPU)
+  Time_ms_per_batch: 0.038896999903954566
+  Speedup_vs_Sklearn: 25.430958750974963
+- Method: Sklearn (CPU)
+  Time_ms_per_batch: 0.9891880000941456
+  Speedup_vs_Sklearn: 1.0
