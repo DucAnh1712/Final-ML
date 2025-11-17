@@ -163,11 +163,9 @@ Follow these steps in order. Each script processes data and saves its output, wh
 -----
 ## 4. Step 2: Exploratory Data Analysis (EDA)
 
-Before building any models, we ran `visualize_weather.py` to deeply understand the data. This step answers the core questions from the project brief.
+Before building any models, we ran `visualize_weather.py` to deeply understand the data.
 
 ### 4.1. Data Dictionary (Understanding the Features)
-
-The brief asks: *"Explain the meaning and values in each column. For example, what does feature 'moonphase' mean?"*.
 
 The dataset has 33 features. While most are self-explanatory (e.g., `temp`, `humidity`, `precip`), key specialized columns include:
 
@@ -195,15 +193,13 @@ We also plotted the average annual temperature to check for a long-term trend.
 
 This plot shows significant year-to-year variation, with a cool year in 2017 (28.1°C) and a sharp peak in 2024 (29.1°C). Overall, the data suggests a **slight warming trend** across the decade.
 
-#### 4.2.1. Phân tích Phân phối (Bổ sung từ IPYNB)
-
-Notebook cũng phân tích histogram của cột `temp` để xem phân phối của nó.
+#### 4.2.1. Distribution Analysis
 
 ![alt text](daily/plots/temp_distribution.png)
 
 **Findings:**
-1.  **Slightly Bimodal (Hai đỉnh nhẹ):** Có hai đỉnh nhỏ, một quanh 27.5°C (Mùa mưa) và một quanh 30°C (Mùa khô).
-2.  **Left-Skewed (Lệch trái):** Dữ liệu hơi lệch về phía bên trái, cho thấy có nhiều ngày mát mẻ hơn một chút so với những ngày cực kỳ nóng.
+1.  **Slightly Bimodal (Two slight peaks)**: There are two small peaks, one around 27.5°C (Rainy Season) and one around 30°C (Dry Season).
+2.  **Left-Skewed:** The data is slightly skewed to the left, indicating there are slightly more cool days than extremely hot days.
 
 ### 4.3. Annual & Seasonal Trends
 
@@ -216,15 +212,15 @@ The data clearly shows two distinct seasons: a **Dry Season** (Dec-Apr) and a **
 
 This seasonal pattern is the most dominant feature of the dataset.
 
-#### 4.3.1. Phân tích Climograph (Bổ sung từ IPYNB)
+#### 4.3.1. Climograph Analysis
 
-Để xác nhận mối quan hệ chu kỳ này, notebook đã vẽ biểu đồ khí hậu (climograph).
+To confirm this cyclical relationship, we plotted a climograph.
 
 ![alt text](daily/plots/climograph_temp_humidity.png)
 
-**Finding:** Biểu đồ cho thấy một **mối quan hệ "vòng lặp" (looping relationship)** rõ rệt. Nó không đi theo đường thẳng, mà thay vào đó, thời tiết "di chuyển" qua các mùa: từ Nóng & Khô (quý 1) -> Nóng & Ẩm (quý 2) -> Mát & Ẩm (quý 3/4) -> và quay trở lại. Đây là bằng chứng trực quan mạnh mẽ cho thấy thời tiết là một chu kỳ.
+**Finding:** The chart shows a distinct **"looping relationship"**. It does not follow a straight line; instead, the weather "moves" through the seasons: from Hot & Dry (Q1) -> Hot & Humid (Q2) -> Cool & Humid (Q3/Q4) -> and back again. This is strong visual evidence that the weather is a cycle.
 
-### 4.4. Correlation Analysis (Answering "How they combine")
+### 4.4. Correlation Analysis
 
 We generated a correlation matrix (heatmap) and scatter plots to find the key drivers of temperature.
 
@@ -232,7 +228,7 @@ We generated a correlation matrix (heatmap) and scatter plots to find the key dr
 
 **Key Findings:**
 
-1.  **High Multicollinearity (Đa cộng tuyến):** There are groups of redundant features:
+1.  **High Multicollinearity:** There are groups of redundant features:
     * **Temperature Group:** `temp`, `tempmax`, `tempmin`, and `feelslike` are all correlated at $r > 0.90$.
     * **Solar Group:** `solarradiation`, `solarenergy`, and `uvindex` are correlated at $r \approx 1.00$.
     * **Action:** We must *not* use all these features. We will select one representative from each group.
@@ -261,13 +257,26 @@ This step, executed by `data_processing.py`, prepares the data for modeling.
       * **Test:** The final 15% of the data.
   * **Handle Missing Values:** The script handles missing data (like `preciptype` and `severerisk`) by filling them, and the final `ColumnPreprocessor` handles any remaining NaNs using `ffill`/`bfill`.
 
+Chắc chắn rồi! Dưới đây là phần **5.2. Feature Engineering (Step 4)** đã được sửa đổi và làm rõ chi tiết, được định dạng hoàn toàn bằng Markdown để bạn đưa vào báo cáo:
+
+---
+
 ### 5.2. Feature Engineering (Step 4)
 
-Using the `feature_engineering.py` script, we created a `sklearn.pipeline` to automatically transform the raw data.
+Using the `feature_engineering.py` script, we created a robust `sklearn.pipeline` to automatically transform the raw data based on physical insights from the EDA.
 
-1.  **`TimeFeatureTransformer`:** Addresses **seasonality**. It converts the `datetime` index into cyclical `sin`/`cos` features for the month and day-of-year = np.sin... This teaches the model that December (12) is "close" to January (1).
-2.  **`DerivedFeatureTransformer`:** Creates new physics-based features from existing ones, such as `temp_range` (`tempmax` - `tempmin`) and `dewpoint_depression` (`temp` - `dew`).
-3.  **`ColumnPreprocessor`:** This is the **anti-leakage** and **anti-multicollinearity** step. It selects only the useful features identified in our EDA and, most importantly, **removes the original `temp` column**, preventing the model from cheating by looking at the answer.
+1.  **`TimeFeatureTransformer`:** Addresses **seasonality** and the cyclic nature of weather. It converts the `datetime` index into cyclical `sin`/`cos` features for the month and day-of-year. This teaches the model that December (12) is "close" to January (1) without abrupt transitions.
+2.  **`DerivedFeatureTransformer`:** Creates new physics-based features from existing ones. This stage generates powerful predictors, including:
+    * **`temp_range`:** Calculated as (`tempmax` - `tempmin`).
+    * **`dewpoint_depression`:** Calculated as (`temp` - `dew`), a strong indicator tied directly to relative humidity.
+    * **Solar Intensity:** Calculates **`daylight_hours`** and derives **`solar_per_hour`** (`solarenergy / daylight_hours`) to provide a normalized measure of daily solar intensity, which is superior to the total solar energy.
+    * **`sealevelpressure_change`:** Calculates the pressure change between consecutive days.
+3.  **`ColumnPreprocessor`:** This is the crucial **anti-leakage** and **anti-multicollinearity** step.
+    * **Anti-Leakage:** It **removes the original `temp` column** from the feature set, preventing the model from cheating by looking at the answer.
+    * **Anti-Multicollinearity:** Based on EDA's correlation analysis, it **selects only one representative** from highly correlated groups. For example:
+        * **Temperature Group:** Redundant columns like `tempmax`, `tempmin`, and `feelslike` were excluded, relying instead on the derived feature **`temp_range`**.
+        * **Solar Group:** We kept **`solarradiation`** as a primary measure but removed highly correlated columns like `solarenergy` and `uvindex` from the final feature set.
+    * **Imputation:** It handles any remaining NaNs using a time-series safe imputation strategy (**Forward-fill, then Backward-fill**).
 
 -----
 
@@ -290,7 +299,7 @@ We first held a "competition" with 6 common models to see which performed best o
 | XGBoost | 0.459 | 0.898 | 95.8% |
 | DecisionTree | 0.000 | 1.242 | \~Very Large |
 
-**Conclusion:** The complex, tree-based models (XGBoost, LGBM) **failed completely**. They overfit the training data (e.g., 95.8% Gap for XGBoost). The simple **Linear Models (LinearRegression, Ridge) won** by a huge margin. This proves our V4 (Daily) features have a strong *linear* relationship with temperature.
+**Conclusion:** The complex, tree-based models (XGBoost, LGBM) **failed completely**. They overfit the training data (e.g., 95.8% Gap for XGBoost). The simple **Linear Models (LinearRegression, Ridge) won** by a huge margin. This proves our Daily features have a strong *linear* relationship with temperature.
 
 ### 6.2. Hyperparameter Tuning (`optuna_search_linear.py`)
 
@@ -301,17 +310,9 @@ Having crowned Linear Models as our champion, we used Optuna to find the best po
 
 This 7-day gap is critical: it matches our 7-day forecast horizon, ensuring that no information from the validation period can *ever* leak into the training period, making our parameter search 100% reliable.
 
-Chào bạn, tôi đã xem xét các biểu đồ 7 ngày (by horizon) và tệp `test_metrics_linear.yaml` mà bạn cung cấp.
-
-Phân tích T+1 của bạn đã rất tốt, nhưng nó chỉ là một phần của câu chuyện. Yêu cầu của bạn là "phân tích các model nói chung", vì vậy tôi đã mở rộng phần này để phân tích *xu hướng* (trend) của 7 mô hình khi chúng dự báo xa hơn về tương lai (T+1 đến T+7).
-
-Đây là phiên bản cập nhật, kết hợp cả phân tích T+1 (là trường hợp tốt nhất) và phân tích "chung" (xu hướng 7 ngày).
-
----
-
 ### 6.3. Final Daily Model & Metrics Interpretation
 
-We ran `train_linear.py` to train 7 final models (one for each day, T+1 to T+7) on 85% of the data. The brief asks us to "use them all [metrics], understand and interprete them".
+We ran `train_linear.py` to train 7 final models (one for each day, T+1 to T+7) on 85% of the data.
 
 We will first analyze the **T+1 model** as our "best-case" scenario, and then analyze the **general trend** across all 7 models.
 
@@ -405,9 +406,10 @@ However, it exhibits a **rapid decline** in performance and a **significant degr
 
 To make our model accessible, we built a web application using Streamlit. This app loads the saved `feature_pipeline.pkl`, `scaler.pkl`, and the 7 trained model files (`.pkl`) to deliver a 7-day temperature forecast to the end-user in an interactive interface.
 
+You can access the live application here: https://aduongne-ml-final.hf.space
 -----
 
-## 8\. Step 7: Retraining Strategy (When to Retrain?)
+## 8\. Step 7: Retraining Strategy
 
 First, we must understand *why* retraining is necessary. A model may perform well today, but its performance can degrade over time. This is known as **Model Drift**.
 
