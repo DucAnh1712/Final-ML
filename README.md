@@ -1,6 +1,7 @@
 # PROJECT REPORT: SAIGON (HCMC) TEMPERATURE FORECASTING
 
   * **Team:** Group 6
+    
     **Member:**
      * Nguyễn Thị Mai Anh - 11230511
      * Trương Đức Anh - 11230516
@@ -584,6 +585,7 @@ The benchmark comparing the native Scikit-learn model with the converted ONNX mo
 
 
 **Conclusion:** Converting our Scikit-learn models to ONNX and utilizing the ONNX Runtime resulted in an astonishing **$\approx 25.8$ times speed increase** in inference time compared to the native Python implementation. This ensures the forecasting system can handle hourly prediction requests with extremely low latency in a production environment.
+
 
 
 
