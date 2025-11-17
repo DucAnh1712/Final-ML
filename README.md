@@ -1,7 +1,7 @@
 # PROJECT REPORT: SAIGON (HCMC) TEMPERATURE FORECASTING
 
   * **Team:** Group 6
-  * **Subject:** Subject 2: Saigon Temperature Forecasting
+  * **Subject:** Saigon Temperature Forecasting
 
 * **Project Framework:** This MLOps pipeline is developed entirely in Python, utilizing key libraries such as **Scikit-learn** for modeling, **Optuna** for hyperparameter tuning, and **Streamlit** for the deployment interface.
 
@@ -577,4 +577,5 @@ The benchmark comparing the native Scikit-learn model with the converted ONNX mo
 
 
 **Conclusion:** Converting our Scikit-learn models to ONNX and utilizing the ONNX Runtime resulted in an astonishing **$\approx 25.8$ times speed increase** in inference time compared to the native Python implementation. This ensures the forecasting system can handle hourly prediction requests with extremely low latency in a production environment.
+
 
