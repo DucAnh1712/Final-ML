@@ -7,7 +7,6 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, m
 import config
 
 def load_production_models():
-    # (Hàm này đã chuẩn, không cần sửa)
     print("Loading production components...")
     
     pipeline_path = os.path.join(config.MODEL_DIR, config.PIPELINE_NAME)
@@ -31,20 +30,14 @@ def load_production_models():
     return pipeline, scaler, models
 
 def load_test_data():
-    """
-    ✅ SỬA LỖI: Load test data (với DatetimeIndex)
-    Giống hệt logic của 'optuna_search_linear.py'
-    """
     test_path = os.path.join(config.PROCESSED_DATA_DIR, "data_test.csv")
     
-    # ✅ SỬA LỖI: Load file CSV với DatetimeIndex
     df_test = pd.read_csv(
         test_path,
-        index_col=0,      # Dùng cột 0 (chính là 'datetime') làm index
-        parse_dates=[0]   # Ép kiểu cột 0 thành datetime
+        index_col=0, 
+        parse_dates=[0]
     )
     
-    # ✅ SỬA LỖI: Sắp xếp và đảm bảo cột 'datetime' tồn tại
     df_test = df_test.sort_index()
     if 'datetime' not in df_test.columns:
          df_test['datetime'] = df_test.index
@@ -56,7 +49,6 @@ def load_test_data():
     return X_test_raw, df_test 
 
 def calculate_metrics(y_actual, y_pred):
-    # (Hàm này đã chuẩn, không cần sửa)
     return {
         "RMSE": float(np.sqrt(mean_squared_error(y_actual, y_pred))),
         "MAE": float(mean_absolute_error(y_actual, y_pred)),
@@ -68,13 +60,10 @@ def main():
     pipeline, scaler, models = load_production_models()
     X_test_raw, df_test_full = load_test_data()
 
-    # ✅ SỬA LỖI: Đảm bảo X_test_raw có DatetimeIndex
-    # (Đã được sửa trong hàm load_test_data())
     print(f"\n--- Evaluating {config.TARGET_FORECAST_COLS} ---")
 
     # 1. Run pipeline (Transform, Scale) ONCE
     print(f"⚙️ Transforming test features...")
-    # X_test_raw giờ đã có DatetimeIndex chuẩn
     X_feat_test = pipeline.transform(X_test_raw)
     print(f"⚙️ Scaling test features...")
     X_scaled_test = scaler.transform(X_feat_test)
@@ -84,23 +73,18 @@ def main():
     all_metrics = {}
     all_predictions = {}
     
-    # ✅ SỬA LỖI: Đảm bảo chúng ta lưu DatetimeIndex
     all_predictions['datetime'] = X_scaled_test_df.index 
 
     # ======================================================
-    # 2. LOOP & PREDICT FOR EACH HORIZON (Đã chuẩn, không cần sửa)
+    # 2. LOOP & PREDICT FOR EACH HORIZON 
     # ======================================================
-    for target_name in config.TARGET_FORECAST_COLS: # Tự động lặp qua t24, t48,...
+    for target_name in config.TARGET_FORECAST_COLS: 
         print(f"\n--- Predicting {target_name} ---")
         model = models[target_name]
         
-        # 3. Align y_actual (Get from raw data)
-        # df_test_full giờ đã có DatetimeIndex chuẩn
+        # 3. Align y_actual (Get from raw data)\
         y_actual_raw = df_test_full[target_name]
         y_actual_aligned = y_actual_raw.copy()
-        
-        # ✅ SỬA LỖI: Căn chỉnh y_actual_aligned với index của X
-        # (Vì pipeline có thể drop vài hàng đầu tiên do lag/rolling)
         y_actual_aligned = y_actual_aligned.loc[X_feat_test.index]
 
         # 4. Predict
@@ -128,17 +112,13 @@ def main():
         all_predictions[target_name] = y_actual_aligned
         all_predictions[pred_col_name] = y_pred_series
 
-    # ✅ SỬA LỖI: Đọc tên file output từ config.py
     metrics_path = os.path.join(config.OUTPUT_DIR, config.TEST_METRICS_LINEAR_NAME)
     with open(metrics_path, "w") as f:
         yaml.dump(all_metrics, f, sort_keys=False)
     print(f"\n💾 All test metrics saved to: {metrics_path}")
     
-    # ✅ SỬA LỖI: Đọc tên file output từ config.py
     pred_path = os.path.join(config.OUTPUT_DIR, config.TEST_PREDS_LINEAR_NAME)
     df_preds = pd.DataFrame(all_predictions)
-    
-    # ✅ SỬA LỖI: Set 'datetime' làm index khi lưu file
     df_preds = df_preds.set_index('datetime')
     df_preds.to_csv(pred_path)
     print(f"💾 All predictions saved to: {pred_path}")

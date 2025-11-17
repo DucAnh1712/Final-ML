@@ -6,10 +6,9 @@ import joblib
 import yaml
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, mean_absolute_percentage_error
 import config
-# (Không cần import xgb, chỉ load file pkl)
 
 def load_production_models():
-    print("Loading production components (XGBoost)...") # ⬅️ Sửa log
+    print("Loading production components (XGBoost)...")
     
     pipeline_path = os.path.join(config.MODEL_DIR, config.PIPELINE_NAME)
     scaler_path = os.path.join(config.MODEL_DIR, config.SCALER_NAME)
@@ -22,7 +21,6 @@ def load_production_models():
     
     models = {}
     for target_name in config.TARGET_FORECAST_COLS:
-        # ✅ SỬA 1: Dùng tên model XGBOOST
         model_name = f"{target_name}_{config.MODEL_NAME_XGBOOST}"
         model_path = os.path.join(config.MODEL_DIR, model_name)
         if not os.path.exists(model_path):
@@ -32,9 +30,7 @@ def load_production_models():
     print(f"✅ Pipeline, Scaler, and {len(models)} XGBoost models loaded.") # ⬅️ Sửa log
     return pipeline, scaler, models
 
-# (Hàm load_test_data và calculate_metrics giữ nguyên y hệt)
 def load_test_data():
-    # (Copy y hệt từ file linear)
     test_path = os.path.join(config.PROCESSED_DATA_DIR, "data_test.csv")
     df_test = pd.read_csv(test_path, index_col=0, parse_dates=[0])
     df_test = df_test.sort_index()
@@ -45,7 +41,6 @@ def load_test_data():
     return X_test_raw, df_test 
 
 def calculate_metrics(y_actual, y_pred):
-    # (Copy y hệt từ file linear)
     return {
         "RMSE": float(np.sqrt(mean_squared_error(y_actual, y_pred))),
         "MAE": float(mean_absolute_error(y_actual, y_pred)),
@@ -54,12 +49,9 @@ def calculate_metrics(y_actual, y_pred):
     }
 
 def main():
-    # (Tất cả logic trong main() giữ nguyên y hệt,
-    # chỉ sửa 2 dòng lưu file cuối cùng)
-    
     pipeline, scaler, models = load_production_models()
     X_test_raw, df_test_full = load_test_data()
-    print(f"\n--- Evaluating {config.TARGET_FORECAST_COLS} (XGBoost) ---") # ⬅️ Sửa log
+    print(f"\n--- Evaluating {config.TARGET_FORECAST_COLS} (XGBoost) ---")
     
     # 1. Run pipeline
     print(f"⚙️ Transforming test features...")
@@ -93,20 +85,18 @@ def main():
         all_predictions[target_name] = y_actual_aligned
         all_predictions[pred_col_name] = y_pred_series
 
-    # ✅ SỬA 2: Dùng tên file metrics XGBOOST
     metrics_path = os.path.join(config.OUTPUT_DIR, config.TEST_METRICS_XGBOOST_NAME)
     with open(metrics_path, "w") as f:
         yaml.dump(all_metrics, f, sort_keys=False)
     print(f"\n💾 All test metrics saved to: {metrics_path}")
     
-    # ✅ SỬA 3: Dùng tên file predictions XGBOOST
     pred_path = os.path.join(config.OUTPUT_DIR, config.TEST_PREDS_XGBOOST_NAME)
     df_preds = pd.DataFrame(all_predictions)
     df_preds = df_preds.set_index('datetime')
     df_preds.to_csv(pred_path)
     print(f"💾 All predictions saved to: {pred_path}")
     
-    print("\n🎉 Multi-Horizon XGBoost evaluation complete.") # ⬅️ Sửa log
+    print("\n🎉 Multi-Horizon XGBoost evaluation complete.") 
 
 if __name__ == "__main__":
     main()

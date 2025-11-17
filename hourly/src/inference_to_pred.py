@@ -20,7 +20,6 @@ def load_production_models():
     scaler = joblib.load(scaler_path)
     
     models = {}
-    # Vòng lặp này sẽ tự động load 24 models (t+1 đến t+24)
     for target_name in config.TARGET_FORECAST_COLS:
         model_name = f"{target_name}_{config.MODEL_NAME_LIGHTGBM}"
         model_path = os.path.join(config.MODEL_DIR, model_name)
@@ -65,7 +64,6 @@ def main():
     all_predictions['datetime'] = X_scaled_test_df.index 
 
     # 2. LOOP & PREDICT
-    # Vòng lặp này sẽ tự động chạy 24 lần (t+1 đến t+24)
     for target_name in config.TARGET_FORECAST_COLS:
         print(f"\n--- Predicting {target_name} ---")
         model = models[target_name]

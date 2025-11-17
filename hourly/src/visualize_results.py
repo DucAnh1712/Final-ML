@@ -7,15 +7,14 @@ import seaborn as sns
 import config
 import sys
 
-# (Hàm load_one_metric_file và load_all_metrics giữ nguyên như cũ)
-
 def load_one_metric_file(filepath, model_type, metric_type):
     """
-    Hàm helper: Tải 1 file YAML, chuyển thành DF, và thêm cột
+    Helper function: Loads one YAML file, converts it to a DataFrame, 
+    and adds columns for model type and metric type (Train/Test).
     """
     if not os.path.exists(filepath):
-        print(f"❌ CẢNH BÁO: Không tìm thấy file metrics: {filepath}")
-        print("   Hãy chạy file train/inference tương ứng trước.")
+        print(f"❌ WARNING: Metrics file not found: {filepath}")
+        print("   Run the corresponding train/inference file first.")
         return None
     
     try:
@@ -26,22 +25,22 @@ def load_one_metric_file(filepath, model_type, metric_type):
         df['model_type'] = model_type
         df['metric_type'] = metric_type
         
-        # Chuyển 'target_t24', 'target_t48' -> 1, 2, 3... (Ngày)
+        # Convert 'target_t24', 'target_t48' -> 1, 2, 3... (Days)
         horizon_hours = df.index.str.replace('target_t', '').astype(int)
         df['Horizon'] = horizon_hours / 24
         
         return df
     except Exception as e:
-        print(f"❌ Lỗi khi đọc file {filepath}: {e}")
+        print(f"❌ Error reading file {filepath}: {e}")
         return None
 
 def load_all_metrics():
     """
-    Tải TẤT CẢ 6 file metrics (Train/Test của 3 mô hình)
+    Loads ALL 6 metrics files (Train/Test for 3 models: Linear, XGBoost, LightGBM).
     """
     all_dfs = []
     
-    # === 1. Tải mô hình Linear ===
+    # === 1. Load Linear Model ===
     all_dfs.append(load_one_metric_file(
         os.path.join(config.OUTPUT_DIR, config.TRAIN_METRICS_LINEAR_NAME),
         'Linear', 'Train'
@@ -51,7 +50,7 @@ def load_all_metrics():
         'Linear', 'Test'
     ))
     
-    # === 2. Tải mô hình XGBoost ===
+    # === 2. Load XGBoost Model ===
     all_dfs.append(load_one_metric_file(
         os.path.join(config.OUTPUT_DIR, config.TRAIN_METRICS_XGBOOST_NAME),
         'XGBoost', 'Train'
@@ -61,7 +60,7 @@ def load_all_metrics():
         'XGBoost', 'Test'
     ))
     
-    # === 3. Tải mô hình LightGBM ===
+    # === 3. Load LightGBM Model ===
     all_dfs.append(load_one_metric_file(
         os.path.join(config.OUTPUT_DIR, config.TRAIN_METRICS_LIGHTGBM_NAME),
         'LightGBM', 'Train'
@@ -71,38 +70,40 @@ def load_all_metrics():
         'LightGBM', 'Test'
     ))
     
-    # Kiểm tra nếu có file nào bị thiếu
+    # Check if any file is missing
     if any(df is None for df in all_dfs):
-        print("\nMột hoặc nhiều file metrics bị thiếu. Dừng chương trình.")
+        print("\nOne or more metrics files are missing. Halting program.")
         return None
         
-    # Gộp tất cả lại
+    # Combine all DataFrames
     full_df = pd.concat(all_dfs)
     
-    print("✅ Đã tải và gộp thành công 6 file metrics.")
+    print("✅ Successfully loaded and combined 6 metrics files.")
     return full_df
 
 # ===================================================================
-# CÁC HÀM VẼ BIỂU ĐỒ (ĐÃ CẬP NHẬT)
+# PLOTTING FUNCTIONS (UPDATED)
 # ===================================================================
 
 def plot_test_metric_comparison(df_test_only, metric_name, title, ylabel, filename, higher_is_better=False):
     """
-    Hàm chung để vẽ 3 mô hình cho 1 chỉ số Test (RMSE, MAE, R2)
+    Generic function to plot 3 models for a single Test metric (RMSE, MAE, R2).
     """
     plt.figure(figsize=(10, 6))
     sns.set_style("whitegrid")
     
-    # Sắp xếp legend theo hiệu suất
-    sorted_models = df_test_only.groupby('model_type')[metric_name].mean().sort_values(ascending=higher_is_better).index
+    # Sort legend by performance (e.g., lower RMSE is better, higher R2 is better)
+    sorted_models = df_test_only.groupby('model_type')[metric_name].mean().sort_values(
+        ascending=higher_is_better
+    ).index
     
     sns.lineplot(
         data=df_test_only,
         x='Horizon',
         y=metric_name,
-        hue='model_type', # 3 màu cho 3 mô hình
-        hue_order=sorted_models, # Sắp xếp legend
-        style='model_type', # 3 kiểu đường cho 3 mô hình
+        hue='model_type', # 3 colors for 3 models
+        hue_order=sorted_models, # Sort legend
+        style='model_type', # 3 line styles for 3 models
         style_order=sorted_models,
         markers=True,
         linewidth=2.5,
@@ -110,34 +111,34 @@ def plot_test_metric_comparison(df_test_only, metric_name, title, ylabel, filena
     )
     
     plt.title(title, fontsize=16, fontweight='bold')
-    plt.xlabel('Ngày dự báo (T+N)', fontsize=12)
+    plt.xlabel('Forecast Day (T+N)', fontsize=12)
     plt.ylabel(ylabel, fontsize=12)
-    plt.xticks(range(1, 8)) # 1, 2, ... 7
-    plt.legend(title="Mô hình (Tốt nhất -> Kém nhất)")
+    plt.xticks(range(1, 8)) # 1, 2, ... 7 days
+    plt.legend(title="Model (Best -> Worst)")
     plt.grid(True, alpha=0.7)
 
     plot_path = os.path.join(config.OUTPUT_DIR, filename)
     plt.savefig(plot_path, dpi=120)
-    print(f"💾 Đã lưu biểu đồ: {plot_path}")
+    print(f"💾 Chart saved: {plot_path}")
 
 def plot_overfitting_comparison(df):
     """
-    Biểu đồ 4: So sánh độ Overfitting (Gap) của 3 mô hình
+    Chart 4: Compares Overfitting (Train-Test RMSE Gap) of 3 Models.
     """
-    # 1. Pivot data để có Train/Test trên cùng 1 hàng
+    # 1. Pivot data to get Train/Test RMSE on the same row
     df_pivot = df.pivot_table(
         index=['Horizon', 'model_type'], 
         columns='metric_type', 
-        values='RMSE' # Vẫn dùng RMSE làm gốc
+        values='RMSE' # Use RMSE as the basis
     ).reset_index()
     
-    # 2. Tính toán Gap
+    # 2. Calculate Gap percentage
     df_pivot['Gap (%)'] = (df_pivot['Test'] - df_pivot['Train']) / df_pivot['Train'] * 100
     
     plt.figure(figsize=(10, 6))
     sns.set_style("whitegrid")
     
-    # 3. Vẽ biểu đồ Gap
+    # 3. Plot Gap chart
     sns.lineplot(
         data=df_pivot,
         x='Horizon',
@@ -149,63 +150,63 @@ def plot_overfitting_comparison(df):
         markersize=8
     )
     
-    plt.title('So sánh Overfitting (Train-Test RMSE Gap) 3 Mô hình (Hourly)', fontsize=16, fontweight='bold')
-    plt.xlabel('Ngày dự báo (T+N)', fontsize=12)
+    plt.title('Overfitting Comparison (Train-Test RMSE Gap) for 3 Models (Hourly)', fontsize=16, fontweight='bold')
+    plt.xlabel('Forecast Day (T+N)', fontsize=12)
     plt.ylabel('Overfitting (Gap %)', fontsize=12)
     plt.xticks(range(1, 8))
-    plt.legend(title="Mô hình")
-    plt.axhline(0, color='black', linestyle='--', linewidth=1) # Đường 0%
+    plt.legend(title="Model")
+    plt.axhline(0, color='black', linestyle='--', linewidth=1) # 0% Line
     plt.grid(True, alpha=0.7)
 
     plot_path = os.path.join(config.OUTPUT_DIR, 'compare_ALL_MODELS_Overfitting_Gap.png')
     plt.savefig(plot_path, dpi=120)
-    print(f"💾 Đã lưu biểu đồ Overfitting Gap: {plot_path}")
+    print(f"💾 Overfitting Gap chart saved: {plot_path}")
 
 def main():
-    # Load tất cả 6 file
+    # Load all 6 files
     df_full_metrics = load_all_metrics()
     
     if df_full_metrics is not None:
-        # Lọc ra data Test để tái sử dụng
+        # Filter Test data for reuse
         df_test_only = df_full_metrics[df_full_metrics['metric_type'] == 'Test'].copy()
 
-        # === VẼ 4 BIỂU ĐỒ ===
+        # === PLOT 4 CHARTS ===
         
-        # 1. Biểu đồ RMSE (Lỗi tuyệt đối)
+        # 1. RMSE Chart (Absolute Error)
         plot_test_metric_comparison(
             df_test_only,
             metric_name='RMSE',
-            title='So sánh Hiệu suất (Test RMSE) 3 Mô hình (Hourly)',
-            ylabel='RMSE (Lỗi nhiệt độ °C)',
+            title='Performance Comparison (Test RMSE) for 3 Models (Hourly)',
+            ylabel='RMSE (Temperature Error °C)',
             filename='compare_ALL_MODELS_Test_RMSE.png',
-            higher_is_better=False # RMSE: Càng thấp càng tốt
+            higher_is_better=False # RMSE: Lower is better
         )
         
-        # 2. Biểu đồ R2 (Độ "fit")
+        # 2. R2 Chart (Goodness of Fit)
         plot_test_metric_comparison(
             df_test_only,
             metric_name='R2',
-            title='So sánh Độ "Fit" (Test R2) 3 Mô hình (Hourly)',
+            title='Goodness of Fit Comparison (Test R2) for 3 Models (Hourly)',
             ylabel='R-Squared (R²)',
             filename='compare_ALL_MODELS_Test_R2.png',
-            higher_is_better=True # R2: Càng cao càng tốt
+            higher_is_better=True # R2: Higher is better
         )
         
-        # 3. Biểu đồ MAE (Lỗi tuyệt đối)
+        # 3. MAE Chart (Absolute Error)
         plot_test_metric_comparison(
             df_test_only,
             metric_name='MAE',
-            title='So sánh Hiệu suất (Test MAE) 3 Mô hình (Hourly)',
-            ylabel='MAE (Lỗi nhiệt độ °C)',
+            title='Performance Comparison (Test MAE) for 3 Models (Hourly)',
+            ylabel='MAE (Temperature Error °C)',
             filename='compare_ALL_MODELS_Test_MAE.png',
-            higher_is_better=False # MAE: Càng thấp càng tốt
+            higher_is_better=False # MAE: Lower is better
         )
         
-        # 4. Biểu đồ Overfitting (Dùng df_full_metrics)
+        # 4. Overfitting Chart (Using df_full_metrics)
         plot_overfitting_comparison(df_full_metrics)
         
-        print("\n🎉 HOÀN TẤT TRỰC QUAN HÓA SO SÁNH 3 MÔ HÌNH!")
-        print(f"Xem 4 file .png trong: {config.OUTPUT_DIR}")
+        print("\n🎉 FINISHED VISUALIZING COMPARISON OF 3 MODELS!")
+        print(f"See 4 .png files in: {config.OUTPUT_DIR}")
 
 if __name__ == "__main__":
     # Dependency checks

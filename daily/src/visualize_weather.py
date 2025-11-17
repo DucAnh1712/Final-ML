@@ -1,3 +1,4 @@
+# visualize_weather.py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -5,13 +6,7 @@ import seaborn as sns
 import os
 import config
 
-# --- CONFIGURATION ---
-
-# 1. Path to the data file
-# !!! IMPORTANT: Change this path to point to your file
 PLOTS_DIR = config.PLOT_DIR
-
-# --- HELPER FUNCTIONS ---
 
 def load_data(filepath):
     """Loads and performs basic cleaning on the weather data."""
@@ -28,8 +23,10 @@ def load_data(filepath):
 
 def get_season(month):
     """Determines the season based on the month."""
+    # Rainy Season: May (5) to November (11)
     if 5 <= month <= 11:
         return 'Rainy'
+    # Dry Season: December (12) to April (4)
     else:
         return 'Dry'
 
@@ -47,17 +44,49 @@ def save_plot(fig, filename, dpi=120):
     plt.close(fig)
 
 # --- VISUALIZATION FUNCTIONS ---
+def plot_daily_temp_with_confidence(df, window=30):
+    """
+    Visualizes the average daily temperature using a rolling mean (like an exponential moving average)
+    and shows the standard deviation band, similar to the Training Reward chart.
+    """
+    print(f"Plotting: Daily temperature chart (Rolling Mean, window={window})...")
 
-def plot_daily_temperature(df):
-    """Visualizes the average daily temperature (Time Series)."""
-    print("Plotting: Daily temperature chart...")
+    # 1. Calculate Rolling Mean (smoother line)
+    # The 'window' parameter defines the number of days to average over (e.g., 30 days = 1 month)
+    df_temp = df[['datetime', 'temp']].set_index('datetime')
+    rolling_mean = df_temp['temp'].rolling(window=window, center=True).mean()
+    rolling_std = df_temp['temp'].rolling(window=window, center=True).std()
+
+    # 2. Define the upper/lower bounds (Mean +/- Std Dev)
+    upper_bound = rolling_mean + rolling_std
+    lower_bound = rolling_mean - rolling_std
+
+    # 3. Create the Plot
     fig, ax = plt.subplots(figsize=(14, 7))
-    ax.plot(df["datetime"], df["temp"], color="#297fbd", linewidth=1.0, label="Avg Temperature (°C)")
-    ax.set_title("Average Daily Temperature in HCMC (2015-2025)", fontsize=16, fontweight="bold")
+
+    # Fill the area between the upper and lower bounds (similar to the shaded area in the original chart)
+    ax.fill_between(df_temp.index, lower_bound, upper_bound,
+                    color="#4e79a7", alpha=0.3, label="$\pm 1$ Std. Dev.")
+
+    # Plot the Rolling Mean (the main, smooth line)
+    ax.plot(df_temp.index, rolling_mean, color="#297fbd", linewidth=2.0, label=f"Avg. Temp ({window}-day Rolling Mean)")
+
+    # Optional: Plot the raw daily temperature for context (very faint)
+    # ax.plot(df_temp.index, df_temp['temp'], color='gray', linewidth=0.5, alpha=0.2, label="Daily Temp")
+
+
+    ax.set_title(f"Average Daily Temperature in HCMC ({df['year'].min()}-{df['year'].max()} - Rolling Mean)", fontsize=16, fontweight="bold")
     ax.set_xlabel("Year", fontsize=12)
     ax.set_ylabel("Temperature (°C)", fontsize=12)
-    ax.legend()
+    ax.legend(loc='lower right')
     ax.grid(True, alpha=0.5)
+
+    # Clean up x-axis ticks to show years better
+    import matplotlib.dates as mdates
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+    ax.xaxis.set_major_locator(mdates.YearLocator())
+
+
     save_plot(fig, "daily_temp_timeseries.png")
 
 def plot_monthly_temperature(df):
@@ -113,10 +142,10 @@ def plot_temperature_distribution(df):
     print("Plotting: Temperature distribution histogram...")
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    # Sử dụng histplot của seaborn để có biểu đồ đẹp hơn, kèm đường KDE
+    # Use seaborn's histplot for a better chart with KDE line
     sns.histplot(df['temp'], bins=30, kde=True, ax=ax, color='#3498db', edgecolor='white')
     
-    # Lấy đường KDE từ ax và tô màu đậm hơn
+    # Get the KDE line from ax and set a darker color
     line = ax.lines[0]
     line.set_color('#2980b9')
     line.set_linewidth(2.5)
@@ -126,7 +155,7 @@ def plot_temperature_distribution(df):
     ax.set_ylabel('Frequency (Days)', fontsize=12)
     ax.grid(True, linestyle='--', alpha=0.6)
     
-    # Thêm đường vạch cho giá trị trung bình
+    # Add a vertical line for the mean value
     mean_temp = df['temp'].mean()
     ax.axvline(mean_temp, color='red', linestyle='--', linewidth=2, label=f'Mean: {mean_temp:.2f}°C')
     ax.legend()
@@ -157,7 +186,7 @@ def plot_scatter_relationships(df):
                 line_kws={'color': 'darkorange', 'linewidth': 2, 'linestyle': '--'}, 
                 ax=ax)
     ax.set_title('Relationship between Solar Radiation and Temperature', fontsize=16, fontweight="bold")
-    ax.set_xlabel('Solar Radiation (W/m²)')
+    ax.set_xlabel('Solar Radiation ($W/m^2$)', fontsize=12)
     ax.set_ylabel('Temperature (°C)')
     ax.grid(True, linestyle='--', alpha=0.5)
     save_plot(fig, "scatter_temp_vs_solar.png")
@@ -294,8 +323,7 @@ def main():
     }).reset_index()
     
     # Run the visualization functions
-    plot_daily_temperature(df)
-    plot_monthly_temperature(df)
+    plot_daily_temp_with_confidence(df, window=30) # 30 ngày tương đương với 1 tháng    plot_monthly_temperature(df)
     plot_annual_temperature(df)
     plot_seasonal_comparison(df)
     plot_temperature_distribution(df)

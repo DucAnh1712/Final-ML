@@ -1,3 +1,4 @@
+# hourly/src/feature_engineering.py
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -5,8 +6,8 @@ from sklearn.pipeline import Pipeline
 
 class TimeFeatureTransformer(BaseEstimator, TransformerMixin):
     """
-    ✅ NÂNG CẤP (HOURLY): Tạo cyclical time features (sin/cos encoding)
-    cho cả chu kỳ năm (yearly) và ngày (daily).
+    UPGRADE (HOURLY): Creates cyclical time features (sin/cos encoding) 
+    for both yearly and daily cycles.
     """
     def __init__(self):
         pass
@@ -17,36 +18,37 @@ class TimeFeatureTransformer(BaseEstimator, TransformerMixin):
     def transform(self, X):
         df = X.copy()
         
-        # 1. Đảm bảo có DatetimeIndex
+        # 1. Ensure DatetimeIndex is present
         if not pd.api.types.is_datetime64_any_dtype(df.index):
             if 'datetime' not in df.columns:
                 df = df.reset_index()
             df['datetime'] = pd.to_datetime(df['datetime'])
             df = df.set_index('datetime', drop=False)
         
-        # 2. Đặc trưng chu kỳ năm (Giữ nguyên)
+        # 2. Yearly cyclical features (Unchanged)
         df['month'] = df.index.month
         df['day_of_year'] = df.index.dayofyear
         df['day_of_week'] = df.index.dayofweek
         
+        # Cyclical encoding
         df['month_sin'] = np.sin(2 * np.pi * df['month'] / 12)
         df['month_cos'] = np.cos(2 * np.pi * df['month'] / 12)
         df['day_sin'] = np.sin(2 * np.pi * df['day_of_year'] / 365)
         df['day_cos'] = np.cos(2 * np.pi * df['day_of_year'] / 365)
         
-        # 3. ✅ THÊM MỚI (HOURLY): Đặc trưng chu kỳ 24 giờ
+        # 3. ✅ NEW ADDITION (HOURLY): 24-hour cyclical features
         df['hour'] = df.index.hour
         df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
         df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
         
-        # 4. Trả về
+        # 4. Return, dropping helper columns
         return df.drop(columns=['month', 'day_of_year', 'day_of_week', 'hour'])
 
 
 class DerivedFeatureTransformer(BaseEstimator, TransformerMixin):
     """
-    ✅ NÂNG CẤP (HOURLY): Tạo derived features,
-    thêm các đặc trưng trễ (lag) và trượt (rolling) 24 giờ.
+    UPGRADE (HOURLY): Creates derived features, adding 24-hour lag 
+    and rolling features, crucial for hourly forecasting.
     """
     def __init__(self):
         pass
@@ -57,7 +59,7 @@ class DerivedFeatureTransformer(BaseEstimator, TransformerMixin):
     def transform(self, X):
         df = X.copy()
         
-        # Các đặc trưng row-wise (Giữ nguyên)
+        # Row-wise features (Unchanged)
         if 'sunrise' in df.columns and 'sunset' in df.columns:
             sr = pd.to_datetime(df['sunrise'], errors='coerce')
             ss = pd.to_datetime(df['sunset'], errors='coerce')
@@ -76,21 +78,25 @@ class DerivedFeatureTransformer(BaseEstimator, TransformerMixin):
             df['dewpoint_depression'] = df['temp'] - df['dew']
         
         if 'sealevelpressure' in df.columns:
-            # .diff(1) là thay đổi so với 1 GIỜ trước
+            # .diff(1) is the change compared to 1 HOUR ago
             df['sealevelpressure_change'] = df['sealevelpressure'].diff() 
         
-        # ✅ THÊM MỚI (HOURLY): Đặc trưng trễ 24 giờ (cực kỳ quan trọng)
-        # Lấy giá trị của 24 giờ trước
-        df['temp_lag_24h'] = df['temp'].shift(24)
-        df['humidity_lag_24h'] = df['humidity'].shift(24)
+        # ✅ NEW ADDITION (HOURLY): 24-hour lag features (critical for time series)
+        # Gets the value from 24 hours ago
+        if 'temp' in df.columns:
+            df['temp_lag_24h'] = df['temp'].shift(24)
+        if 'humidity' in df.columns:
+            df['humidity_lag_24h'] = df['humidity'].shift(24)
         
-        # ✅ THÊM MỚI (HOURLY): Đặc trưng trượt (Rolling)
-        # shift(1) để tránh rò rỉ (leakage) dữ liệu của giờ hiện tại
-        # min_periods=1 để xử lý các NaN ở 23 giờ đầu tiên
-        df['temp_rolling_avg_24h'] = df['temp'].shift(1).rolling(24, min_periods=1).mean()
-        df['precip_rolling_sum_24h'] = df['precip'].shift(1).rolling(24, min_periods=1).sum()
+        # ✅ NEW ADDITION (HOURLY): Rolling features
+        # shift(1) to prevent current-hour data leakage
+        # min_periods=1 to handle NaNs in the first 23 hours
+        if 'temp' in df.columns:
+            df['temp_rolling_avg_24h'] = df['temp'].shift(1).rolling(24, min_periods=1).mean()
+        if 'precip' in df.columns:
+            df['precip_rolling_sum_24h'] = df['precip'].shift(1).rolling(24, min_periods=1).sum()
         
-        # fillna(0) cho các đặc trưng .diff() và .shift()
+        # fillna(0) for .diff() and .shift() features
         cols_to_fill = ['sealevelpressure_change', 'temp_lag_24h', 
                         'humidity_lag_24h', 'temp_rolling_avg_24h',
                         'precip_rolling_sum_24h']
@@ -104,17 +110,17 @@ class DerivedFeatureTransformer(BaseEstimator, TransformerMixin):
 
 class ColumnPreprocessor(BaseEstimator, TransformerMixin):
     """
-    ✅ NÂNG CẤP (HOURLY): Cập nhật danh sách cột và sửa cú pháp fillna.
+    UPGRADE (HOURLY): Updates column list and fixes fillna syntax.
     """
     def __init__(self):
-        # 1. Core weather features (Giữ nguyên)
+        # 1. Core weather features (Unchanged)
         self.feature_cols = [
             'humidity', 'sealevelpressure', 'dew', 'cloudcover', 
             'solarradiation', 'visibility', 'windspeed', 'windgust', 'precip',
-            'temp'  # Sẽ bị remove sau (tránh target leakage)
+            'temp'  # Will be removed later (to avoid target leakage)
         ]
         
-        # 2. ✅ CẬP NHẬT: Danh sách derived features
+        # 2. ✅ UPDATE: List of derived features
         self.derived_cols = [
             # Time (Yearly)
             'month_sin', 'month_cos', 'day_sin', 'day_cos',
@@ -139,7 +145,7 @@ class ColumnPreprocessor(BaseEstimator, TransformerMixin):
         
         self.final_cols = existing_features + existing_derived
         
-        # ✅ Remove 'temp' to avoid target leakage (Giữ nguyên)
+        # ✅ Remove 'temp' to avoid target leakage (Unchanged)
         if 'temp' in self.final_cols:
             self.final_cols.remove('temp')
         
@@ -149,11 +155,11 @@ class ColumnPreprocessor(BaseEstimator, TransformerMixin):
         """Select columns and handle missing values"""
         df = X[self.final_cols].copy()
         
-        # ✅ SỬA CÚ PHÁP (Hết cảnh báo FutureWarning)
-        df = df.ffill() # Lấp các NaN bằng giá trị phía trước
-        df = df.bfill() # Lấp các NaN còn lại (ở đầu) bằng giáTtrị phía sau
+        # ✅ SYNTAX FIX (Avoid FutureWarning)
+        df = df.ffill() # Forward fill NaNs
+        df = df.bfill() # Backward fill remaining NaNs (at the beginning)
         
-        # Lưới an toàn cuối cùng (nếu toàn bộ cột là NaN)
+        # Final safety net (if the entire column is NaN)
         df = df.fillna(0)
         
         return df
@@ -161,12 +167,12 @@ class ColumnPreprocessor(BaseEstimator, TransformerMixin):
 
 def create_feature_pipeline():
     """
-    Tạo pipeline feature engineering hoàn chỉnh (Giữ nguyên)
+    Creates the complete feature engineering pipeline (Unchanged)
     
     Pipeline steps:
-    1. TimeFeatureTransformer - Tạo cyclical time features (ĐÃ NÂNG CẤP)
-    2. DerivedFeatureTransformer - Tạo derived features (ĐÃ NÂNG CẤP)
-    3. ColumnPreprocessor - Select columns và impute (ĐÃ NÂNG CẤP)
+    1. TimeFeatureTransformer - Creates cyclical time features (UPGRADED)
+    2. DerivedFeatureTransformer - Creates derived features (UPGRADED)
+    3. ColumnPreprocessor - Selects columns and imputes (UPGRADED)
     
     Returns:
     --------

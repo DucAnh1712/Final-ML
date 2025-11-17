@@ -1,3 +1,4 @@
+# hourly/src/config_to_pred.py
 import os
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -18,34 +19,32 @@ RAW_FILE_NAME = "HCMWeatherHourly.xlsx"
 TARGET_COL = "temp"
 
 # ======================================================
-# FORECAST HORIZONS (TÍNH BẰNG GIỜ)
+# FORECAST HORIZONS (IN HOURS)
 # ======================================================
-# ⬅️ THAY ĐỔI: Dự đoán 24 giờ tiếp theo (t+1, t+2, ..., t+24)
+# ⬅️ CHANGE: Predict the next 24 hours (t+1, t+2, ..., t+24)
 FORECAST_HORIZONS = list(range(1, 25)) 
 TARGET_FORECAST_COLS = [f"target_t{h}" for h in FORECAST_HORIZONS]
 
 # ======================================================
-# CROSS-VALIDATION SETTINGS (CHO HOURLY)
+# CROSS-VALIDATION SETTINGS (FOR HOURLY)
 # ======================================================
-CV_N_SPLITS = 5          # Số folds
-CV_GAP_DAYS = 7          # 7 ngày gap
-CV_GAP_ROWS = CV_GAP_DAYS * 24  # 7 ngày * 24 giờ = 168 hàng gap
+CV_N_SPLITS = 5          # Number of folds
+CV_GAP_DAYS = 7          # 7 day gap
+CV_GAP_ROWS = CV_GAP_DAYS * 24 # 7 days * 24 hours = 168 row gap
 
 # ======================================================
 # DATA SPLIT
 # ======================================================
 TRAIN_RATIO = 0.7
-VAL_RATIO = 0.15 # 15% Val + 15% Test
+VAL_RATIO = 0.15 # 15% Validation + 15% Test
 
 # ======================================================
-# MODEL FILENAMES (CHO HOURLY)
+# MODEL FILENAMES (FOR HOURLY)
 # ======================================================
-# Chung
+# General
 PIPELINE_NAME = "feature_pipeline_hourly.pkl"
 SCALER_NAME = "scaler_hourly.pkl"
 BENCHMARK_RESULTS_YAML = "benchmark_results_hourly.yaml"
-
-# ⬅️ Đã xóa tất cả các biến của Linear Model
 
 # # XGBoost
 # MODEL_NAME_XGBOOST = "model_xgboost_hourly.pkl"
@@ -64,22 +63,22 @@ TEST_PREDS_LIGHTGBM_NAME = "test_predictions_hourly.csv"
 # ======================================================
 # OPTUNA FINE-TUNING
 # ======================================================
-OPTUNA_TRIALS = 50 # 50 trials cho mỗi horizon (tổng cộng 50 * 24 = 1200)
+OPTUNA_TRIALS = 50 # 50 trials per horizon (total 50 * 24 = 1200)
 
-# # ✅ Search space cho XGBoost (Đã xóa n_estimators)
+# # ✅ Search space for XGBoost (n_estimators removed)
 # XGBOOST_PARAM_RANGES = {
-#     # n_estimators được xác định bằng early stopping, không tune
-#     'learning_rate': (1e-3, 1e-1),
-#     'max_depth': (3, 10),
-#     'subsample': (0.6, 1.0),
-#     'colsample_bytree': (0.6, 1.0),
-#     'reg_alpha': (1e-5, 1e2),
-#     'reg_lambda': (1e-5, 1e2),
+#     # n_estimators is determined by early stopping, not tuned
+#     'learning_rate': (1e-3, 1e-1),
+#     'max_depth': (3, 10),
+#     'subsample': (0.6, 1.0),
+#     'colsample_bytree': (0.6, 1.0),
+#     'reg_alpha': (1e-5, 1e2),
+#     'reg_lambda': (1e-5, 1e2),
 # }
 
-# ✅ Search space cho LightGBM (Đã xóa n_estimators)
+# ✅ Search space for LightGBM (n_estimators removed)
 PREDICT_PARAM_RANGES = {
-    # n_estimators được xác định bằng early stopping, không tune
+    # n_estimators is determined by early stopping, not tuned
     'learning_rate': (1e-3, 1e-1),
     'max_depth': (3, 10),
     'subsample': (0.6, 1.0),

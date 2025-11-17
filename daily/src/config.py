@@ -23,13 +23,13 @@ TARGET_COL = "temp"
 # ========================
 # FORECAST HORIZONS
 # ========================
-FORECAST_HORIZONS = [1, 2, 3, 4, 5, 6, 7]  # T+1 đến T+7
+FORECAST_HORIZONS = [1, 2, 3, 4, 5, 6, 7]  # T+1 to T+7
 TARGET_FORECAST_COLS = [f"target_t{h}" for h in FORECAST_HORIZONS]
 # ========================
 # CROSS-VALIDATION SETTINGS
 # ========================
-CV_N_SPLITS = 5      # Số folds cho TimeSeriesSplit
-CV_GAP_DAYS = 7      # Gap giữa train và val (khuyến nghị = max horizon)
+CV_N_SPLITS = 5      # Folds for CV
+CV_GAP_DAYS = 7      # Gap between train/val (max horizon)
 
 # ======================================================
 # DATA SPLIT
@@ -56,7 +56,6 @@ OPTUNA_RESULTS_YAML = "optuna_best_params_linear.yaml"
 OPTUNA_TRIALS = 300 
 
 LINEAR_PARAM_RANGES = {
-    # ✅ THÊM 'LinearRegression' VÀO ĐÂY
     'model_type': ['LinearRegression', 'Ridge', 'Lasso', 'ElasticNet'],
     
     'alpha': (1e-5, 1e2), # (log=True)
@@ -68,7 +67,3 @@ LINEAR_PARAM_RANGES = {
 # ======================================================
 CLEARML_PROJECT_NAME = "HCM Weather Forecasting"
 CLEARML_TASK_NAME = "LinearModel Fine-Tuning (7-day)"
-# ========================
-# MODEL TRAINING
-# ========================
-# FINAL_MODEL_PREFIX = "final_linear_model"  # Prefix cho model files

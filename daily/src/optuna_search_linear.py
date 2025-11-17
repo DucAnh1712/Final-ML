@@ -21,14 +21,16 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 class PurgedTimeSeriesSplit:
     """
     Time Series Cross-Validation with a gap to prevent leakage.
+    
     Parameters:
     -----------
-    n_splits : int (fold numbers)
-    gap : int (purge window)
+    n_splits : int (Number of folds)
+    gap : int (Purge window size, in number of samples)
+    
     Example:
     --------
-    |-------- Train --------|  GAP (7 days)  |---- Val ----|
-       Fit pipeline here         (⛔)          Evaluate here
+    |-------- Train --------|   GAP (7 days)   |---- Val ----|
+          Fit pipeline here            (⛔)             Evaluate here
     """
     def __init__(self, n_splits=5, gap=0):
         self.n_splits = n_splits
@@ -38,14 +40,18 @@ class PurgedTimeSeriesSplit:
         n_samples = len(X)
         indices = np.arange(n_samples)
         
+        # Determine the size of the test set for each split
+        # This is a common TimeSeriesSplit approach where train size increases
         test_size = n_samples // (self.n_splits + 1)
         
         for i in range(self.n_splits):
             train_end = (i + 1) * test_size
             val_start = train_end + self.gap
             val_end = val_start + test_size
+            
             if val_end > n_samples:
                 break
+            
             train_indices = indices[:train_end]
             val_indices = indices[val_start:val_end]
             yield train_indices, val_indices
@@ -59,7 +65,8 @@ class PurgedTimeSeriesSplit:
 # =============================================================================
 def align_data_for_tuning(X_raw, y_raw, pipeline, scaler, fit_transform=False):
     """
-    Standard align function: Run pipeline, scale, and join with y to dropna
+    Standard alignment function: Runs the feature pipeline, scales the data, 
+    and joins with y to drop NaNs simultaneously.
     """
     # 1. Run pipeline
     if fit_transform:
@@ -78,6 +85,8 @@ def align_data_for_tuning(X_raw, y_raw, pipeline, scaler, fit_transform=False):
     X_df = pd.DataFrame(X_scaled, index=X_feat.index, columns=X_feat.columns) 
     
     combined = pd.concat([y_df, X_df], axis=1)
+    # Drop rows where the target column is NaN (which were already dropped in load_data_for_tuning,
+    # but this ensures perfect alignment after feature engineering)
     combined_clean = combined.dropna(subset=[y_aligned.name]) 
     
     y_final = combined_clean[y_aligned.name]
@@ -86,15 +95,16 @@ def align_data_for_tuning(X_raw, y_raw, pipeline, scaler, fit_transform=False):
     return X_final, y_final
 
 # =============================================================================
-# DATA LOADING (FIXED - THÊM BƯỚC DROPNA QUAN TRỌNG)
+# DATA LOADING
 # =============================================================================
 def load_data_for_tuning(target_name):
     """
-    ✅ FIXED: Gộp, xử lý datetime VÀ dropna TRƯỚC KHI CV.
+    Loads, concatenates, handles datetime, and drops NaNs from the target column 
+    BEFORE the CV split to ensure clean indices.
     """
     print(f"🔍 Loading RAW data (Train + Val COMBINED) for {target_name}...")
     
-    # 1. Load CSVs (Không parse, không set index)
+    # 1. Load CSVs
     train_df = pd.read_csv(
         os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv")
     )
@@ -105,19 +115,20 @@ def load_data_for_tuning(target_name):
     all_train_data = pd.concat([train_df, val_df], ignore_index=True)
     
     if 'datetime' not in all_train_data.columns:
-         raise KeyError("❌ Không tìm thấy cột 'datetime' trong file CSV.")
+        raise KeyError("❌ 'datetime' column not found in the CSV file.")
     
-    print(f"   ...Sử dụng cột 'datetime' làm cột thời gian")
+    print(f"   ...Using 'datetime' column as time column")
     all_train_data['datetime'] = pd.to_datetime(all_train_data['datetime'])
     all_train_data = all_train_data.set_index('datetime', drop=False)
 
     all_train_data = all_train_data.sort_index()
 
+    # 5. Drop NaNs in target BEFORE CV
     rows_before = len(all_train_data)
     all_train_data = all_train_data.dropna(subset=[target_name])
     rows_after = len(all_train_data)
     if rows_before > rows_after:
-        print(f"   ⚠️ Đã xóa {rows_before - rows_after} hàng có NaN trong cột target.")
+        print(f"   ⚠️ Dropped {rows_before - rows_after} rows with NaN in the target column.")
 
     # 6. Extract X and y
     y_train_full_raw = all_train_data[target_name]
@@ -133,16 +144,16 @@ def load_data_for_tuning(target_name):
 # =============================================================================
 def linear_objective(trial, X_all_train_raw, y_all_train_raw):
     """
-    ✅ FIXED: Objective function với Purged TimeSeriesSplit
+    Objective function using Purged TimeSeriesSplit.
     
-    Đảm bảo:
-    - Mỗi fold có pipeline và scaler riêng
-    - Gap giữa train và val để tránh leakage
-    - Temporal order được bảo toàn
+    Ensures:
+    - Independent pipeline and scaler for each fold (fitted on train only)
+    - Gap between training and validation data to prevent leakage
+    - Temporal order is preserved
     """
     ranges = config.LINEAR_PARAM_RANGES
     
-    # 1. Suggest model và hyperparameters
+    # 1. Suggest model and hyperparameters
     model_type = trial.suggest_categorical("model_type", ranges['model_type'])
     
     if model_type == 'LinearRegression':
@@ -154,13 +165,15 @@ def linear_objective(trial, X_all_train_raw, y_all_train_raw):
         if model_type == 'Lasso':
             model_params['max_iter'] = 2000
         elif model_type == 'ElasticNet':
-            model_params['l1_ratio'] = trial.suggest_float("l1_ratio", *ranges['l1_ratio'])
+            l1_ratio = trial.suggest_float("l1_ratio", *ranges['l1_ratio'])
+            model_params['l1_ratio'] = l1_ratio
             model_params['max_iter'] = 2000
 
-    # ✅ 2. Purged Time Series CV với gap
+    # ✅ 2. Purged Time Series CV with gap
+    # Note: Gap is in samples, not days, but should correspond to config.CV_GAP_DAYS
     tscv = PurgedTimeSeriesSplit(
         n_splits=config.CV_N_SPLITS, 
-        gap=config.CV_GAP_DAYS
+        gap=config.CV_GAP_DAYS # Assuming daily data, gap=7 means 7 samples/days
     )
     
     fold_scores = []
@@ -177,16 +190,20 @@ def linear_objective(trial, X_all_train_raw, y_all_train_raw):
         train_dates = X_train_fold_raw.index
         val_dates = X_val_fold_raw.index
         
-        assert train_dates.max() < val_dates.min(), \
-            f"❌ FOLD {fold_num+1} LEAKAGE DETECTED! Train ends {train_dates.max()}, Val starts {val_dates.min()}"
+        # Check if the training data ends before the validation data starts
+        if train_dates.max() >= val_dates.min():
+             # Handle edge case where gap wasn't large enough or data is extremely sparse
+             raise AssertionError(
+                 f"❌ FOLD {fold_num+1} LEAKAGE DETECTED! Train ends {train_dates.max()}, Val starts {val_dates.min()}"
+             )
         
         # Log first fold for verification
         if fold_num == 0:
             gap_days = (val_dates.min() - train_dates.max()).days
-            print(f"  ✅ Fold 1 verified:")
-            print(f"     Train: {train_dates.min().date()} → {train_dates.max().date()}")
-            print(f"     Gap:   {gap_days} days")
-            print(f"     Val:   {val_dates.min().date()} → {val_dates.max().date()}")
+            print(f"   ✅ Fold 1 verified:")
+            print(f"      Train: {train_dates.min().date()} → {train_dates.max().date()}")
+            print(f"      Gap:   {gap_days} days (>= {config.CV_GAP_DAYS} expected)")
+            print(f"      Val:   {val_dates.min().date()} → {val_dates.max().date()}")
 
         # ✅ 4. Create NEW pipeline and scaler for this fold
         feature_pipeline_fold = create_feature_pipeline()
@@ -235,9 +252,9 @@ def linear_objective(trial, X_all_train_raw, y_all_train_raw):
 # =============================================================================
 def run_optuna_search_linear():
     """
-    Run Optuna hyperparameter search for all forecast horizons
+    Runs Optuna hyperparameter search for all forecast horizons.
     """
-    # Initialize ClearML task
+    # Initialize ClearML task (optional but good practice)
     task = Task.init(
         project_name=config.CLEARML_PROJECT_NAME,
         task_name=config.CLEARML_TASK_NAME,
@@ -260,7 +277,7 @@ def run_optuna_search_linear():
         print(f"🔍 Starting Optuna search...")
         print(f"   Strategy: {config.CV_N_SPLITS}-Fold Purged TimeSeriesSplit (Gap={config.CV_GAP_DAYS} days)")
         print(f"   Trials:   {config.OPTUNA_TRIALS}")
-        print(f"   ⚠️  This will take time (re-fits pipelines in each fold)...\n")
+        print(f"   ⚠️   This will take time (re-fits pipelines in each fold)...\n")
         
         # Create and run Optuna study
         study = optuna.create_study(direction="minimize")
@@ -319,7 +336,7 @@ def run_optuna_search_linear():
     print(f"\n📊 Summary of Best RMSE:")
     for target, score in all_best_scores.items():
         print(f"   {target}: {score:.4f}")
-    print(f"\n🚀 NEXT STEP: Run 'python train_linear.py' to train final models")
+    print(f"\n🚀 NEXT STEP: Run 'python train.py' to train final models")
     print("="*80)
     
     task.close()

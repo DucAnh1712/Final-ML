@@ -5,26 +5,24 @@ import numpy as np
 import joblib
 import yaml
 from sklearn.preprocessing import RobustScaler
-import xgboost as xgb # ⬅️ THAY ĐỔI 1
+import xgboost as xgb
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from clearml import Task 
 import config
 from feature_engineering import create_feature_pipeline
 
-# ⬅️ THAY ĐỔI 2: Load đúng file params
 def load_optuna_best_params_xgb():
-    params_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_XGBOOST_YAML) # ⬅️ Đổi tên file
+    params_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_XGBOOST_YAML) 
     if not os.path.exists(params_path):
         raise FileNotFoundError(
             f"❌ {params_path} not found\n"
-            f"Please run 'python optuna_search_xgboost.py' first!" # ⬅️ Đổi tên file
+            f"Please run 'python optuna_search_xgboost.py' first!"
         )
     with open(params_path, 'r') as f:
         data = yaml.load(f, Loader=yaml.FullLoader)
     print(f"✅ Loaded Optuna XGBoost params from: {params_path}")
     return data['best_params']
 
-# (Hàm align_data_final giữ nguyên)
 def align_data_final(X_feat_scaled_df, y_raw_series):
     y_aligned = y_raw_series.copy()
     y_aligned.index = X_feat_scaled_df.index 
@@ -35,9 +33,7 @@ def align_data_final(X_feat_scaled_df, y_raw_series):
     X_final = combined_clean.drop(columns=[y_aligned.name])
     return X_final, y_final
 
-# ⬅️ THAY ĐỔI 3: Tạo model XGBoost
 def create_model_from_params_xgb(params):
-    # Thêm các params mặc định
     model_params = params.copy()
     model_params.setdefault('random_state', 42)
     model_params.setdefault('n_jobs', -1)
@@ -48,23 +44,21 @@ def create_model_from_params_xgb(params):
 def main():
     task = Task.init(
         project_name=config.CLEARML_PROJECT_NAME,
-        #task_name=config.CLEARML_TASK_NAME + " (XGBoost Production)", # ⬅️ Đổi tên Task
-        task_name="Optuna XGBoost (Hourly)", # ⬅️ Đổi tên
-        tags=["Production", "XGBoost", "Multi-Horizon", "Hourly"] # ⬅️ Đổi Tags
+        task_name="Optuna XGBoost (Hourly)", 
+        tags=["Production", "XGBoost", "Multi-Horizon", "Hourly"] 
     )
     
     try:
-        all_best_params = load_optuna_best_params_xgb() # ⬅️ Gọi hàm mới
+        all_best_params = load_optuna_best_params_xgb()
     except FileNotFoundError as e:
         print(str(e))
         return
 
-    print(f"🚀 STARTING PRODUCTION TRAINING (XGBoost, Multi-Horizon, Hourly)") # ⬅️ Đổi tên
+    print(f"🚀 STARTING PRODUCTION TRAINING (XGBoost, Multi-Horizon, Hourly)")
     print("="*70)
 
     # ======================================================
     # 1. LOAD DATA (Merge Train + Val)
-    # (Copy y hệt từ train_linear.py, đã có logic xử lý datetime)
     # ======================================================
     print(f"📂 Loading data (Train+Val)...")
     train_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
@@ -79,7 +73,6 @@ def main():
 
     # ======================================================
     # 2. FIT PIPELINE & SCALER (ONCE)
-    # (Phần này giữ nguyên, nó sẽ đọc config.PIPELINE_NAME_HOURLY v.v.)
     # ======================================================
     feature_pipeline = create_feature_pipeline()
     scaler = RobustScaler()
@@ -114,14 +107,14 @@ def main():
         # 5. FIT MODEL (FROM TUNE RESULTS)
         if target_name not in all_best_params:
             print(f"⚠️ Tuned params not found for {target_name}. Using default XGBoost.")
-            model = xgb.XGBRegressor(n_jobs=-1, random_state=42) # ⬅️ Đổi default
+            model = xgb.XGBRegressor(n_jobs=-1, random_state=42)
         else:
             best_params = all_best_params[target_name]
             task.connect(best_params, name=f'Best Params ({target_name})')
-            model = create_model_from_params_xgb(best_params) # ⬅️ Gọi hàm mới
+            model = create_model_from_params_xgb(best_params)
         
         print(f"⏳ Training final {target_name} model...")
-        model.fit(X_final_train, y_final_train) # ⬅️ Fit trên toàn bộ Train+Val
+        model.fit(X_final_train, y_final_train)
         print(f"✅ Training complete!")
 
         # 6. CALCULATE TRAIN METRICS
@@ -135,19 +128,17 @@ def main():
         print(f"   Train RMSE: {train_metrics['RMSE']:.4f}")
 
         # 7. SAVE MODEL (separate name for each target)
-        # ⬅️ THAY ĐỔI 4: Dùng tên model XGB
         model_name = f"{target_name}_{config.MODEL_NAME_XGBOOST}" 
         model_path = os.path.join(config.MODEL_DIR, model_name)
         joblib.dump(model, model_path)
         print(f"💾 Model saved to: {model_path}")
 
-    # ⬅️ THAY ĐỔI 5: Dùng tên file metrics XGB
     metrics_path = os.path.join(config.OUTPUT_DIR, config.TRAIN_METRICS_XGBOOST_NAME)
     with open(metrics_path, "w") as f:
         yaml.dump(all_train_metrics, f, sort_keys=False)
     print(f"\n💾 All train metrics saved to: {metrics_path}")
     
-    print(f"\n🚀 NEXT STEP: Run 'python inference_xgboost.py'") # ⬅️ Đổi tên
+    print(f"\n🚀 NEXT STEP: Run 'python inference_xgboost.py'")
     task.close()
 
 if __name__ == "__main__":

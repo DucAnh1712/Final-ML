@@ -45,7 +45,7 @@ def create_model_from_params_lgbm(params):
 def main():
     task = Task.init(
         project_name=config.CLEARML_PROJECT_NAME,
-        task_name="Train LightGBM (Hourly)", # Đặt tên task rõ ràng
+        task_name="Train LightGBM (Hourly)",
         tags=["Production", "LightGBM", "Multi-Horizon", "Hourly"] 
     )
     
@@ -93,7 +93,6 @@ def main():
     X_scaled_full = scaler.transform(X_feat_full)
     X_scaled_full_df = pd.DataFrame(X_scaled_full, index=X_feat_full.index, columns=X_feat_full.columns)
 
-    # Vòng lặp này sẽ tự động chạy 24 lần (t+1 đến t+24)
     for target_name in config.TARGET_FORECAST_COLS: 
         print("\n" + "="*30)
         print(f"🎯 Training LightGBM for: {target_name}")

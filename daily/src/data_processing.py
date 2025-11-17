@@ -62,7 +62,7 @@ def main():
     val_path = os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv")
     test_path = os.path.join(config.PROCESSED_DATA_DIR, "data_test.csv")
 
-    # ✅ Save with index=True to preserve datetime
+    # Save with index=True to preserve datetime
     train_df.to_csv(train_path, index=True)
     val_df.to_csv(val_path, index=True)
     test_df.to_csv(test_path, index=True)

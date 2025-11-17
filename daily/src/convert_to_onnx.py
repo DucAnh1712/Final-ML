@@ -2,15 +2,13 @@
 import os
 import joblib
 import pandas as pd
-import config  # Import your config file
-
-# Import thư viện ONNX
+import config
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 
 def get_num_features_from_scaler(scaler_path):
     """
-    Tải scaler đã lưu và trả về số lượng features nó mong đợi.
+    Loads the saved scaler and returns the number of features it expects.
     """
     if not os.path.exists(scaler_path):
         print(f"❌ Error: Scaler not found at {scaler_path}")
@@ -28,28 +26,28 @@ def get_num_features_from_scaler(scaler_path):
 
 def main():
     """
-    Chuyển đổi tất cả 7 model hồi quy (T+1 đến T+7) sang định dạng ONNX.
+    Converts all 7 regression models (T+1 to T+7) to the ONNX format.
     """
-    print("🚀 Starting ONNX conversion for 7 Linear Models...")
+    print("🚀 Starting ONNX conversion for multiple Models...")
 
-    # 1. Tải scaler để lấy số lượng features
+    # 1. Load the scaler to get the feature count
     scaler_path = os.path.join(config.MODEL_DIR, config.SCALER_NAME)
     num_features = get_num_features_from_scaler(scaler_path)
     
     if num_features is None:
         return
 
-    # 2. Định nghĩa "hình dạng" (shape) của dữ liệu đầu vào cho các model
-    # Đây là đầu vào *SAU KHI* đã qua tiền xử lý (đã qua pipeline và scaler)
-    # [None, num_features] có nghĩa là: (batch_size tùy ý, số lượng features cố định)
+    # 2. Define the input "shape" for the models
+    # This is the input *AFTER* preprocessing (after pipeline and scaler)
+    # [None, num_features] means: (arbitrary batch_size, fixed number of features)
     initial_type = [('float_input', FloatTensorType([None, num_features]))]
 
-    # 3. Lặp và chuyển đổi từng model
-    for target_name in config.TARGET_FORECAST_COLS: # Lặp 7 lần
+    # 3. Iterate and convert each model
+    for target_name in config.TARGET_FORECAST_COLS: # Loop for each target (e.g., T+1 to T+7)
         print("\n" + "="*50)
         print(f"🎯 Converting model for: {target_name}")
         
-        # 3a. Tải model .pkl
+        # 3a. Load the .pkl model
         model_pkl_name = f"{target_name}_{config.MODEL_NAME}"
         model_pkl_path = os.path.join(config.MODEL_DIR, model_pkl_name)
         
@@ -61,7 +59,7 @@ def main():
         model = joblib.load(model_pkl_path)
         print(f"✅ Loaded model: {model_pkl_name}")
 
-        # 3b. Chuyển đổi model sang ONNX
+        # 3b. Convert the model to ONNX
         onnx_model_name = f"{target_name}_{config.MODEL_NAME}.onnx"
         onnx_model_path = os.path.join(config.MODEL_DIR, onnx_model_name)
         
@@ -74,7 +72,7 @@ def main():
                 target_opset=12 
             )
 
-            # 3c. Lưu model ONNX
+            # 3c. Save the ONNX model
             with open(onnx_model_path, "wb") as f:
                 f.write(onnx_model.SerializeToString())
             

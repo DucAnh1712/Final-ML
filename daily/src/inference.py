@@ -1,4 +1,4 @@
-# inference_linear.py (MULTI-HORIZON VERSION)
+# inference_linear.py
 import os
 import pandas as pd
 import numpy as np
@@ -21,7 +21,6 @@ def load_production_models():
     pipeline = joblib.load(pipeline_path)
     scaler = joblib.load(scaler_path)
     
-    # ✅ CHANGE: Load 7 models
     models = {}
     for target_name in config.TARGET_FORECAST_COLS: # Loop through 7 targets
         model_name = f"{target_name}_{config.MODEL_NAME}"
@@ -30,7 +29,7 @@ def load_production_models():
             raise FileNotFoundError(f"Model {model_name} not found. Please run train_linear.py.")
         models[target_name] = joblib.load(model_path)
         
-    print(f"✅ Pipeline, Scaler, and {len(models)} models loaded.")
+    print(f"Pipeline, Scaler, and {len(models)} models loaded.")
     return pipeline, scaler, models
 
 def load_test_data():
@@ -39,7 +38,7 @@ def load_test_data():
     df_test = pd.read_csv(test_path)
     df_test['datetime'] = pd.to_datetime(df_test['datetime'])
     
-    print(f"✅ Test data loaded: {df_test.shape}")
+    print(f"Test data loaded: {df_test.shape}")
     
     X_test_raw = df_test.copy()
     # df_test contains the target columns (y_actual)
@@ -74,7 +73,7 @@ def main():
     all_predictions['datetime'] = X_scaled_test_df.index # Save index
 
     # ======================================================
-    # 2. LOOP & PREDICT FOR EACH HORIZON (✅ CHANGE)
+    # 2. LOOP & PREDICT FOR EACH HORIZON
     # ======================================================
     for target_name in config.TARGET_FORECAST_COLS: # Loop 7 times
         print(f"\n--- Predicting {target_name} ---")

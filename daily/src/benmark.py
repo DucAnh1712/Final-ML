@@ -1,193 +1,228 @@
+# benmark.py
 import os
-import time
-import joblib
-import numpy as np
-import onnxruntime as ort
-import config  # Tệp config.py của bạn
-
-# --- THÊM VÀO ---
-# Import các thư viện để lưu kết quả
 import pandas as pd
+import numpy as np
+import joblib
 import yaml
+from sklearn.preprocessing import RobustScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.tree import DecisionTreeRegressor # ✅ New model
+from lightgbm import LGBMRegressor
+import xgboost as xgb
+import config
+from feature_engineering import create_feature_pipeline # ✅ Import NEW pipeline
+import lightgbm as lgb
 import warnings
 
-# Bỏ qua các cảnh báo không cần thiết
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
-# --- KẾT THÚC THÊM VÀO ---
 
-
-# ======================================================
-# 1. CÀI ĐẶT
-# ======================================================
-MODEL_DIR = config.MODEL_DIR
-
-PIPELINE_FILENAME = 'onnx_convertible_pipeline.pkl'
-PIPELINE_PATH = os.path.join(MODEL_DIR, PIPELINE_FILENAME)
-
-# Chọn một mô hình để benchmark
-TARGET_DAY = config.TARGET_FORECAST_COLS[0] # Ví dụ: 'target_T+1'
-MODEL_NAME = f"{TARGET_DAY}_{config.MODEL_NAME}" # Ví dụ: 'target_T+1_model_daily'
-
-PKL_PATH = os.path.join(MODEL_DIR, MODEL_NAME) # <-- Đã thêm .pkl
-ONNX_PATH = os.path.join(MODEL_DIR, f"{MODEL_NAME}.onnx")
-
-# Cấu hình benchmark
-N_SAMPLES = 1000  # Số lượng mẫu trong 1 lô
-N_ITERATIONS = 100 # Chạy bao nhiêu lần để lấy trung bình
-
-
-def get_num_features_from_pipeline(pipeline_path):
-    """
-    Tải pipeline tiền xử lý và đếm số lượng features đầu ra
-    từ bước 'preprocess_columns'.
-    """
-    if not os.path.exists(pipeline_path):
-        print(f"❌ Error: Pipeline not found at {pipeline_path}")
-        print(f"Please run train_linear.py first to create '{PIPELINE_FILENAME}'")
-        return None
+def align_data(X_raw, y_raw, pipeline, scaler, fit_transform=False):
+    """New align function, compatible with NEW pipeline"""
     
+    # 1. Run pipeline (Input is X_raw, output is X_feat)
+    if fit_transform:
+        X_feat = pipeline.fit_transform(X_raw)
+        X_scaled = scaler.fit_transform(X_feat)
+    else:
+        X_feat = pipeline.transform(X_raw)
+        X_scaled = scaler.transform(X_feat)
+    
+    # 2. Align y
+    y_aligned = y_raw.copy()
+    y_aligned.index = X_feat.index # Assign DatetimeIndex to y
+    
+    # 3. Repack to dropna
+    y_df = pd.DataFrame(y_aligned)
+    X_df = pd.DataFrame(X_scaled, index=X_feat.index, columns=X_feat.columns) 
+    
+    combined = pd.concat([y_df, X_df], axis=1)
+    combined_clean = combined.dropna()
+    
+    y_clean = combined_clean[y_aligned.name]
+    X_clean = combined_clean.drop(columns=[y_aligned.name])
+    
+    return X_clean, y_clean
+
+def run_benchmark():
+    print(f"🚀 STARTING MODEL BENCHMARK")
+    print("="*70)
+    print(f"Features: Derived Features (from Colab)")
+    print("="*70)
+
+    # ======================================================
+    # 1. LOAD DATA (Train/Val/Test)
+    # ======================================================
+    print("📂 Loading all data...")
+    train_df_raw = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
+    val_df_raw = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv"))
+    test_df_raw = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_test.csv"))
+    
+    target_name = config.TARGET_FORECAST_COLS[0]
+    print(f"🎯 Benchmarking for single target: {target_name}")
+
+    # Small helper function to set the index for all 3 files
+    def set_datetime_idx(df, file_name):
+        if 'datetime' not in df.columns:
+            raise KeyError(f"❌ 'datetime' column not found in file {file_name}")
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        df = df.set_index('datetime', drop=False)
+        df = df.sort_index()
+        return df
+
+    train_df_raw = set_datetime_idx(train_df_raw, "data_train.csv")
+    val_df_raw = set_datetime_idx(val_df_raw, "data_val.csv")
+    test_df_raw = set_datetime_idx(test_df_raw, "data_test.csv")
+    print("    ...Set DatetimeIndex for all 3 files")
+    
+    # Now dropna
+    train_df = train_df_raw.dropna(subset=[target_name]).copy()
+    val_df = val_df_raw.dropna(subset=[target_name]).copy()
+    test_df = test_df_raw.dropna(subset=[target_name]).copy()
+    print(f"    ...Cleaned up NaN in target column")
+
+    # These variables now have a DatetimeIndex
+    y_train_raw = train_df[target_name] 
+    X_train_raw = train_df.copy()
+    
+    y_val_raw = val_df[target_name]
+    X_val_raw = val_df.copy()
+
+    y_test_raw = test_df[target_name]
+    X_test_raw = test_df.copy()
+
+    # ======================================================
+    # 2. PREPARE PIPELINE & DATA (Fit/Transform)
+    # ======================================================
+    print("🛠️ Preparing data (Fitting NEW pipeline on Train)...")
+    feature_pipeline_fit = create_feature_pipeline()
+    scaler_fit = RobustScaler()
+
+    # Fit_transform on Train
+    print("    ...Fitting pipeline and scaler on Train data")
+    # Pipeline is fitted on X (which has DatetimeIndex)
+    X_train_feat = feature_pipeline_fit.fit_transform(X_train_raw)
+    X_train_final = pd.DataFrame(scaler_fit.fit_transform(X_train_feat), index=X_train_feat.index, columns=X_train_feat.columns)
+    
+    y_train_final = y_train_raw.loc[X_train_final.index] 
+
+    # Transform on Val
+    print("    ...Transforming Val data")
+    X_val_feat = feature_pipeline_fit.transform(X_val_raw)
+    X_val_final = pd.DataFrame(scaler_fit.transform(X_val_feat), index=X_val_feat.index, columns=X_val_feat.columns)
+    y_val_final = y_val_raw.loc[X_val_final.index]
+    
+    # Transform on Test
+    print("    ...Transforming Test data")
+    X_test_feat = feature_pipeline_fit.transform(X_test_raw)
+    X_test_final = pd.DataFrame(scaler_fit.transform(X_test_feat), index=X_test_feat.index, columns=X_test_feat.columns)
+    y_test_final = y_test_raw.loc[X_test_final.index]
+    
+    print(f"📊 Train data: X={X_train_final.shape}, y={y_train_final.shape}")
+    print(f"📊 Val data: X={X_val_final.shape}, y={y_val_final.shape}")
+    print(f"📊 Test data: X={X_test_final.shape}, y={y_test_final.shape}")
+    
+    # ======================================================
+    # 3. DEFINE MODELS
+    # ======================================================
+    models = {
+        "LinearRegression": LinearRegression(n_jobs=-1),
+        
+        "Ridge": Ridge(random_state=42),
+        
+        "DecisionTree": DecisionTreeRegressor(random_state=42),
+        
+        "RandomForest": RandomForestRegressor(
+            n_estimators=100,
+            max_depth=10, 
+            min_samples_leaf=5,
+            n_jobs=-1,
+            random_state=42
+        ),
+        
+        "LightGBM": LGBMRegressor(
+            n_estimators=1000,
+            learning_rate=0.05,
+            n_jobs=-1,
+            random_state=42
+        ),
+        
+        "XGBoost": xgb.XGBRegressor(
+            n_estimators=1000,
+            learning_rate=0.05,
+            n_jobs=-1,
+            random_state=42,
+            early_stopping_rounds=100
+        )
+    }
+
+    results = []
+
+    # ======================================================
+    # 4. RUN BENCHMARK
+    # ======================================================
+    for name, model in models.items():
+        print(f"\n--- Training {name} ---")
+        
+        if name == "LightGBM":
+            model.fit(
+                X_train_final, y_train_final,
+                eval_set=[(X_val_final, y_val_final)],
+                callbacks=[lgb.early_stopping(100, verbose=False)]
+            )
+        elif name == "XGBoost":
+            model.fit(
+                X_train_final, y_train_final,
+                eval_set=[(X_val_final, y_val_final)],
+                verbose=False
+            )
+        else:
+            model.fit(X_train_final, y_train_final)
+        
+        # Predict
+        y_train_pred = model.predict(X_train_final)
+        y_val_pred = model.predict(X_val_final)
+        y_test_pred = model.predict(X_test_final)
+        
+        # Calculate Metrics
+        train_rmse = np.sqrt(mean_squared_error(y_train_final, y_train_pred))
+        val_rmse = np.sqrt(mean_squared_error(y_val_final, y_val_pred))
+        test_rmse = np.sqrt(mean_squared_error(y_test_final, y_test_pred))
+        
+        print(f"✅ {name} Done. Train RMSE: {train_rmse:.4f} | Val RMSE: {val_rmse:.4f} | Test RMSE: {test_rmse:.4f}")
+        
+        results.append({
+            "Model": name,
+            "Train_RMSE": train_rmse,
+            "Val_RMSE": val_rmse,
+            "Test_RMSE": test_rmse,
+            "Gap_Val (%)": (val_rmse - train_rmse) / train_rmse * 100,
+            "Gap_Test (%)": (test_rmse - train_rmse) / train_rmse * 100
+        })
+
+    # ======================================================
+    # 5. SHOW & SAVE RESULTS
+    # ======================================================
+    print("\n" + "="*70)
+    print("🏆 FINAL BENCHMARK RESULTS 🏆")
+    print("="*70)
+    
+    results_df = pd.DataFrame(results).sort_values(by="Test_RMSE")
+    print(results_df.to_string(index=False, float_format="%.4f"))
+
+    # 1. Convert to dict to save YAML
+    results_dict = results_df.to_dict('records')
+    
+    # 2. Save YAML file
+    output_path = os.path.join(config.OUTPUT_DIR, config.BENCHMARK_RESULTS_YAML)
     try:
-        full_preprocessing_pipeline = joblib.load(pipeline_path)
-        feature_pipeline = full_preprocessing_pipeline.named_steps['feature_engineering']
-        preprocessor_step = feature_pipeline.named_steps['preprocess_columns']
-        num_features = len(preprocessor_step.final_cols)
-        
-        print(f"✅ Loaded pipeline. Detected {num_features} output features from ColumnPreprocessor.")
-        return num_features
-        
+        with open(output_path, "w") as f:
+            yaml.dump(results_dict, f, sort_keys=False)
+        print(f"\n💾 Benchmark results saved to: {output_path}")
     except Exception as e:
-        print(f"❌ Error loading pipeline or getting feature count: {e}")
-        return None
+        print(f"\n❌ Error saving benchmark results: {e}")
 
-# ======================================================
-# 2. TẠO DỮ LIỆU ĐẦU VÀO GIẢ
-# ======================================================
-print("🚀 Starting Inference Benchmark...")
-num_features = get_num_features_from_pipeline(PIPELINE_PATH)
-if num_features is None:
-    exit()
-
-print(f"Creating dummy data: ({N_SAMPLES}, {num_features}) features.")
-dummy_data = np.random.rand(N_SAMPLES, num_features).astype(np.float32)
-
-# ======================================================
-# 3. TẢI CÁC MODEL
-# ======================================================
-
-print("Loading models...")
-# 3a. Tải model Sklearn (.pkl)
-try:
-    model_sklearn = joblib.load(PKL_PATH)
-    print(f"✅ Successfully loaded {PKL_PATH}")
-except Exception as e:
-    print(f"❌ Error loading {PKL_PATH}: {e}")
-    exit()
-
-# 3b. Tải model ONNX (cho CPU)
-try:
-    sess_onnx_cpu = ort.InferenceSession(
-        ONNX_PATH, 
-        providers=['CPUExecutionProvider']
-    )
-    input_name = sess_onnx_cpu.get_inputs()[0].name
-    print(f"✅ Successfully loaded {ONNX_PATH} for CPU.")
-except Exception as e:
-    print(f"❌ Error loading {ONNX_PATH} for CPU: {e}")
-    exit()
-
-# 3c. Tải model ONNX (cho GPU)
-sess_onnx_gpu = None
-try:
-    sess_onnx_gpu = ort.InferenceSession(
-        ONNX_PATH, 
-        providers=['CUDAExecutionProvider']
-    )
-    print(f"✅ Successfully loaded {ONNX_PATH} for GPU (CUDA).")
-except Exception as e:
-    print(f"⚠️ Could not load model for GPU (CUDA): {e}")
-    print("   Make sure you have 'onnxruntime-gpu' installed and have NVIDIA/CUDA drivers.")
-
-# ======================================================
-# 4. CHẠY BENCHMARK
-# ======================================================
-print("\n" + "="*50)
-print(f"Running benchmark with {N_SAMPLES} samples, repeating {N_ITERATIONS} times...")
-print("="*50)
-
-# 4a. Benchmark Sklearn (CPU)
-start_time = time.perf_counter()
-for _ in range(N_ITERATIONS):
-    _ = model_sklearn.predict(dummy_data)
-end_time = time.perf_counter()
-sklearn_time = (end_time - start_time) / N_ITERATIONS
-print(f"⏱️ Sklearn (CPU) : {sklearn_time * 1000:.6f} ms / batch")
-
-# 4b. Benchmark ONNX (CPU)
-start_time = time.perf_counter()
-for _ in range(N_ITERATIONS):
-    _ = sess_onnx_cpu.run(None, {input_name: dummy_data})
-end_time = time.perf_counter()
-onnx_cpu_time = (end_time - start_time) / N_ITERATIONS
-print(f"⏱️ ONNX (CPU)    : {onnx_cpu_time * 1000:.6f} ms / batch")
-
-# 4c. Benchmark ONNX (GPU)
-onnx_gpu_time = None # Khởi tạo
-if sess_onnx_gpu:
-    start_time = time.perf_counter()
-    for _ in range(N_ITERATIONS):
-        _ = sess_onnx_gpu.run(None, {input_name: dummy_data})
-    end_time = time.perf_counter()
-    onnx_gpu_time = (end_time - start_time) / N_ITERATIONS
-    print(f"⏱️ ONNX (GPU)    : {onnx_gpu_time * 1000:.6f} ms / batch")
-
-# ======================================================
-# 5. HIỂN THỊ VÀ LƯU KẾT QUẢ (PHONG CÁCH MỚI)
-# ======================================================
-print("\n" + "="*70)
-print("🏆 FINAL INFERENCE BENCHMARK RESULTS 🏆")
-print("="*70)
-
-# 1. Xây dựng danh sách kết quả
-results = []
-
-results.append({
-    "Method": "Sklearn (CPU)",
-    "Time_ms_per_batch": sklearn_time * 1000,
-    "Speedup_vs_Sklearn": 1.0  # Baseline
-})
-
-results.append({
-    "Method": "ONNX (CPU)",
-    "Time_ms_per_batch": onnx_cpu_time * 1000,
-    "Speedup_vs_Sklearn": sklearn_time / onnx_cpu_time
-})
-
-if onnx_gpu_time:
-    results.append({
-        "Method": "ONNX (GPU)",
-        "Time_ms_per_batch": onnx_gpu_time * 1000,
-        "Speedup_vs_Sklearn": sklearn_time / onnx_gpu_time
-    })
-
-# 2. Chuyển sang DataFrame để in
-results_df = pd.DataFrame(results).sort_values(by="Time_ms_per_batch")
-print(results_df.to_string(index=False, float_format="%.4f"))
-
-# 3. Lưu file YAML
-# BẠN CẦN THÊM BIẾN NÀY VÀO config.py
-INFERENCE_BENCHMARK_YAML = "inference_benchmark.yaml" 
-# Hoặc, nếu bạn đã định nghĩa nó trong config, hãy dùng:
-# INFERENCE_BENCHMARK_YAML = config.INFERENCE_BENCHMARK_YAML
-
-output_path = os.path.join(config.OUTPUT_DIR, INFERENCE_BENCHMARK_YAML)
-
-# Chuyển đổi sang dict
-results_dict = results_df.to_dict('records')
-
-try:
-    with open(output_path, "w") as f:
-        yaml.dump(results_dict, f, sort_keys=False)
-    print(f"\n💾 Inference benchmark results saved to: {output_path}")
-except Exception as e:
-    print(f"\n❌ Error saving inference benchmark results: {e}")
+if __name__ == "__main__":
+    run_benchmark()

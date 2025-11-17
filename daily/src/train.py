@@ -1,11 +1,11 @@
-# train_linear.py
+# train.py
 import os
 import pandas as pd
 import numpy as np
 import joblib
 import yaml
 from sklearn.preprocessing import RobustScaler
-from sklearn.pipeline import Pipeline  # <--- THÊM VÀO
+from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from clearml import Task 
@@ -13,6 +13,7 @@ import config
 from feature_engineering import create_feature_pipeline
 
 def load_optuna_best_params():
+    """Loads the best parameters found during the Optuna search."""
     params_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_YAML)
     if not os.path.exists(params_path):
         raise FileNotFoundError(
@@ -25,16 +26,23 @@ def load_optuna_best_params():
     return data['best_params']
 
 def align_data_final(X_feat_scaled_df, y_raw_series):
+    """Aligns X features with y target and drops rows where target is NaN."""
     y_aligned = y_raw_series.copy()
     y_aligned.index = X_feat_scaled_df.index 
     y_df = pd.DataFrame(y_aligned)
+    
+    # Combine X and y based on index
     combined = pd.concat([y_df, X_feat_scaled_df], axis=1)
+    
+    # Drop NaNs, ensuring data is clean after scaling/alignment
     combined_clean = combined.dropna()
+    
     y_final = combined_clean[y_aligned.name]
     X_final = combined_clean.drop(columns=[y_aligned.name])
     return X_final, y_final
 
 def create_model_from_params(params):
+    """Instantiates the correct linear model with tuned parameters."""
     model_type = params.get('model_type', 'LinearRegression')
     alpha = params.get('alpha', 1.0)
     l1_ratio = params.get('l1_ratio', 0.5)
@@ -44,15 +52,18 @@ def create_model_from_params(params):
         return Ridge(alpha=alpha, random_state=42)
     elif model_type == 'Lasso':
         print(f"   Model: Lasso (alpha={alpha:.4f})")
+        # Set max_iter higher for convergence robustness
         return Lasso(alpha=alpha, random_state=42, max_iter=2000)
     elif model_type == 'ElasticNet':
         print(f"   Model: ElasticNet (alpha={alpha:.4f}, l1_ratio={l1_ratio:.4f})")
+        # Set max_iter higher for convergence robustness
         return ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=42, max_iter=2000)
     else:
         print("   Model: LinearRegression (Default)")
         return LinearRegression(n_jobs=-1)
 
 def main():
+    """Main function to load params, train models, and save artifacts."""
     task = Task.init(
         project_name=config.CLEARML_PROJECT_NAME,
         task_name=config.CLEARML_TASK_NAME + " (Production)",
@@ -80,37 +91,38 @@ def main():
     X_train_full = all_train_data.copy()
 
     # ======================================================
-    # 2. FIT PIPELINE & SCALER (ONCE)
+    # 2. FIT PIPELINE & SCALER (ONCE on full training data)
     # ======================================================
     feature_pipeline = create_feature_pipeline()
     scaler = RobustScaler()
 
-    print("Fitting Feature Pipeline on 85% data...")
+    print("Fitting Feature Pipeline on full training data (Train+Val)...")
     X_feat_full = feature_pipeline.fit_transform(X_train_full)
     
-    print("Fitting Scaler on 85% data...")
+    print("Fitting Scaler on full training data...")
+    # Clean features before fitting the scaler
     X_feat_full_clean = X_feat_full.dropna() 
     scaler.fit(X_feat_full_clean)
     
-    # Lưu các file riêng lẻ (giữ nguyên)
+    # Save individual components (keep them)
     joblib.dump(feature_pipeline, os.path.join(config.MODEL_DIR, config.PIPELINE_NAME))
     joblib.dump(scaler, os.path.join(config.MODEL_DIR, config.SCALER_NAME))
     print(f"💾 Feature Pipeline saved to: {config.PIPELINE_NAME}")
     print(f"💾 Scaler saved to: {config.SCALER_NAME}")
 
     # ======================================================
-    # 2.5. THÊM VÀO: TẠO VÀ LƯU PIPELINE CHO ONNX
+    # 2.5. ADDED: CREATE AND SAVE PIPELINE FOR ONNX
     # ======================================================
     print("\n" + "-"*50)
     print("Creating ONNX-convertible preprocessing pipeline...")
     
-    # Gộp feature_pipeline VÀ scaler (cả 2 đều đã được fit)
+    # Combine feature_pipeline AND scaler (both are already fitted)
     onnx_preprocessing_pipeline = Pipeline([
         ('feature_engineering', feature_pipeline),
         ('scaler', scaler)
     ])
     
-    # Đây là tên tệp mà 'convert_to_onnx.py' đang tìm kiếm
+    # This is the file name that 'convert_to_onnx.py' is looking for
     onnx_pipeline_filename = 'onnx_convertible_pipeline.pkl'
     onnx_pipeline_path = os.path.join(config.MODEL_DIR, onnx_pipeline_filename)
     
@@ -120,7 +132,7 @@ def main():
     print(f"   {onnx_pipeline_path}")
     print("-"*50 + "\n")
     # ======================================================
-    # KẾT THÚC PHẦN THÊM VÀO
+    # END OF ADDED SECTION
     # ======================================================
 
 
@@ -128,10 +140,12 @@ def main():
     # 3. LOOP AND TRAIN EACH MODEL
     # ======================================================
     all_train_metrics = {}
+    
+    # Transform all features using the fitted scaler
     X_scaled_full = scaler.transform(X_feat_full)
     X_scaled_full_df = pd.DataFrame(X_scaled_full, index=X_feat_full.index, columns=X_feat_full.columns)
 
-    # ✅ IMPORTANT LOOP
+    # ✅ IMPORTANT LOOP: Iterate through each forecast horizon
     for target_name in config.TARGET_FORECAST_COLS: # Will loop 7 times
         print("\n" + "="*30)
         print(f"🎯 Training for: {target_name}")
@@ -151,6 +165,7 @@ def main():
             model = LinearRegression(n_jobs=-1)
         else:
             best_params = all_best_params[target_name]
+            # Log best parameters to ClearML
             task.connect(best_params, name=f'Best Params ({target_name})')
             model = create_model_from_params(best_params)
         
@@ -180,7 +195,7 @@ def main():
         yaml.dump(all_train_metrics, f, sort_keys=False)
     print(f"\n💾 All train metrics saved to: {metrics_path}")
     
-    print(f"\n🚀 NEXT STEP: Run 'python inference_linear.py'")
+    print(f"\n🚀 NEXT STEP: Run 'python inference.py'")
     task.close()
 
 if __name__ == "__main__":

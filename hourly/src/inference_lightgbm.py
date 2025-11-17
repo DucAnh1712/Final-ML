@@ -21,19 +21,16 @@ def load_production_models():
     
     models = {}
     for target_name in config.TARGET_FORECAST_COLS:
-        # ✅ SỬA 1: Dùng tên model LIGHTGBM
         model_name = f"{target_name}_{config.MODEL_NAME_LIGHTGBM}"
         model_path = os.path.join(config.MODEL_DIR, model_name)
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model {model_name} not found. Please run lightgbm.py.")
         models[target_name] = joblib.load(model_path)
         
-    print(f"✅ Pipeline, Scaler, and {len(models)} LightGBM models loaded.") # ⬅️ Sửa log
+    print(f"✅ Pipeline, Scaler, and {len(models)} LightGBM models loaded.")
     return pipeline, scaler, models
 
-# (Hàm load_test_data và calculate_metrics giữ nguyên y hệt)
 def load_test_data():
-    # (Copy y hệt từ file linear)
     test_path = os.path.join(config.PROCESSED_DATA_DIR, "data_test.csv")
     df_test = pd.read_csv(test_path, index_col=0, parse_dates=[0])
     df_test = df_test.sort_index()
@@ -44,7 +41,6 @@ def load_test_data():
     return X_test_raw, df_test 
 
 def calculate_metrics(y_actual, y_pred):
-    # (Copy y hệt từ file linear)
     return {
         "RMSE": float(np.sqrt(mean_squared_error(y_actual, y_pred))),
         "MAE": float(mean_absolute_error(y_actual, y_pred)),
@@ -53,12 +49,9 @@ def calculate_metrics(y_actual, y_pred):
     }
 
 def main():
-    # (Tất cả logic trong main() giữ nguyên y hệt,
-    # chỉ sửa 2 dòng lưu file cuối cùng)
-    
     pipeline, scaler, models = load_production_models()
     X_test_raw, df_test_full = load_test_data()
-    print(f"\n--- Evaluating {config.TARGET_FORECAST_COLS} (LightGBM) ---") # ⬅️ Sửa log
+    print(f"\n--- Evaluating {config.TARGET_FORECAST_COLS} (LightGBM) ---")
     
     # 1. Run pipeline
     print(f"⚙️ Transforming test features...")
@@ -92,20 +85,18 @@ def main():
         all_predictions[target_name] = y_actual_aligned
         all_predictions[pred_col_name] = y_pred_series
 
-    # ✅ SỬA 2: Dùng tên file metrics LIGHTGBM
     metrics_path = os.path.join(config.OUTPUT_DIR, config.TEST_METRICS_LIGHTGBM_NAME)
     with open(metrics_path, "w") as f:
         yaml.dump(all_metrics, f, sort_keys=False)
     print(f"\n💾 All test metrics saved to: {metrics_path}")
     
-    # ✅ SỬA 3: Dùng tên file predictions LIGHTGBM
     pred_path = os.path.join(config.OUTPUT_DIR, config.TEST_PREDS_LIGHTGBM_NAME)
     df_preds = pd.DataFrame(all_predictions)
     df_preds = df_preds.set_index('datetime')
     df_preds.to_csv(pred_path)
     print(f"💾 All predictions saved to: {pred_path}")
     
-    print("\n🎉 Multi-Horizon LightGBM evaluation complete.") # ⬅️ Sửa log
+    print("\n🎉 Multi-Horizon LightGBM evaluation complete.")
 
 if __name__ == "__main__":
     main()

@@ -5,26 +5,24 @@ import numpy as np
 import joblib
 import yaml
 from sklearn.preprocessing import RobustScaler
-import lightgbm as lgb # ⬅️ THAY ĐỔI 1
+import lightgbm as lgb
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from clearml import Task 
 import config
 from feature_engineering import create_feature_pipeline
 
-# ⬅️ THAY ĐỔI 2: Load đúng file params
 def load_optuna_best_params_lgbm():
-    params_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_LIGHTGBM_YAML) # ⬅️ Đổi tên file
+    params_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_LIGHTGBM_YAML)
     if not os.path.exists(params_path):
         raise FileNotFoundError(
             f"❌ {params_path} not found\n"
-            f"Please run 'python optuna_search_lightgbm.py' first!" # ⬅️ Đổi tên file
+            f"Please run 'python optuna_search_lightgbm.py' first!"
         )
     with open(params_path, 'r') as f:
         data = yaml.load(f, Loader=yaml.FullLoader)
     print(f"✅ Loaded Optuna LightGBM params from: {params_path}")
     return data['best_params']
 
-# (Hàm align_data_final giữ nguyên)
 def align_data_final(X_feat_scaled_df, y_raw_series):
     y_aligned = y_raw_series.copy()
     y_aligned.index = X_feat_scaled_df.index 
@@ -35,7 +33,6 @@ def align_data_final(X_feat_scaled_df, y_raw_series):
     X_final = combined_clean.drop(columns=[y_aligned.name])
     return X_final, y_final
 
-# ⬅️ THAY ĐỔI 3: Tạo model LightGBM
 def create_model_from_params_lgbm(params):
     model_params = params.copy()
     model_params.setdefault('random_state', 42)
@@ -48,24 +45,21 @@ def create_model_from_params_lgbm(params):
 def main():
     task = Task.init(
         project_name=config.CLEARML_PROJECT_NAME,
-        #task_name=config.CLEARML_TASK_NAME + " (LightGBM Production)", # ⬅️ Đổi tên Task
-        #ask_name=config.CLEARML_TASK_NAME + " (LightGBM Production)", # ⬅️ Đổi tên Task
         task_name="Optuna LightGBM (Hourly)",
-        tags=["Production", "LightGBM", "Multi-Horizon", "Hourly"] # ⬅️ Đổi Tags
+        tags=["Production", "LightGBM", "Multi-Horizon", "Hourly"]
     )
     
     try:
-        all_best_params = load_optuna_best_params_lgbm() # ⬅️ Gọi hàm mới
+        all_best_params = load_optuna_best_params_lgbm()
     except FileNotFoundError as e:
         print(str(e))
         return
 
-    print(f"🚀 STARTING PRODUCTION TRAINING (LightGBM, Multi-Horizon, Hourly)") # ⬅️ Đổi tên
+    print(f"🚀 STARTING PRODUCTION TRAINING (LightGBM, Multi-Horizon, Hourly)")
     print("="*70)
 
     # ======================================================
     # 1. LOAD DATA (Merge Train + Val)
-    # (Copy y hệt từ train_linear.py)
     # ======================================================
     print(f"📂 Loading data (Train+Val)...")
     train_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
@@ -80,7 +74,6 @@ def main():
 
     # ======================================================
     # 2. FIT PIPELINE & SCALER (ONCE)
-    # (Phần này giữ nguyên)
     # ======================================================
     feature_pipeline = create_feature_pipeline()
     scaler = RobustScaler()
@@ -135,19 +128,17 @@ def main():
         print(f"   Train RMSE: {train_metrics['RMSE']:.4f}")
 
         # 7. SAVE MODEL (separate name for each target)
-        # ⬅️ THAY ĐỔI 4: Dùng tên model LGBM
         model_name = f"{target_name}_{config.MODEL_NAME_LIGHTGBM}" 
         model_path = os.path.join(config.MODEL_DIR, model_name)
         joblib.dump(model, model_path)
         print(f"💾 Model saved to: {model_path}")
 
-    # ⬅️ THAY ĐỔI 5: Dùng tên file metrics LGBM
     metrics_path = os.path.join(config.OUTPUT_DIR, config.TRAIN_METRICS_LIGHTGBM_NAME)
     with open(metrics_path, "w") as f:
         yaml.dump(all_train_metrics, f, sort_keys=False)
     print(f"\n💾 All train metrics saved to: {metrics_path}")
     
-    print(f"\n🚀 NEXT STEP: Run 'python inference_lightgbm.py'") # ⬅️ Đổi tên
+    print(f"\n🚀 NEXT STEP: Run 'python inference_lightgbm.py'")
     task.close()
 
 if __name__ == "__main__":

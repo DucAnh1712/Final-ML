@@ -1,3 +1,4 @@
+# hourly/src/train_linear.py
 import os
 import pandas as pd
 import numpy as np
@@ -11,10 +12,8 @@ import config
 from feature_engineering import create_feature_pipeline
 
 def load_optuna_best_params():
-    # ✅ SỬA 1: Dùng đúng tên file params YAML
     params_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_LINEAR_YAML)
     if not os.path.exists(params_path):
-        # ✅ SỬA 2: Hard-code tên file script cho thông báo lỗi
         raise FileNotFoundError(
             f"❌ {params_path} not found\n"
             f"Please run 'python optuna_search_linear.py' first!"
@@ -25,7 +24,6 @@ def load_optuna_best_params():
     return data['best_params']
 
 def align_data_final(X_feat_scaled_df, y_raw_series):
-    # (Hàm này đã chuẩn, giữ nguyên)
     y_aligned = y_raw_series.copy()
     y_aligned.index = X_feat_scaled_df.index 
     y_df = pd.DataFrame(y_aligned)
@@ -36,7 +34,6 @@ def align_data_final(X_feat_scaled_df, y_raw_series):
     return X_final, y_final
 
 def create_model_from_params(params):
-    # (Hàm này đã chuẩn, giữ nguyên)
     model_type = params.get('model_type', 'LinearRegression')
     alpha = params.get('alpha', 1.0)
     l1_ratio = params.get('l1_ratio', 0.5)
@@ -57,7 +54,6 @@ def create_model_from_params(params):
 def main():
     task = Task.init(
         project_name=config.CLEARML_PROJECT_NAME,
-        #task_name="Linear Production (Hourly)", # Đã sửa\
         task_name="Optuna Linear (Hourly)", 
         tags=["Production", "LinearTuned", "Multi-Horizon", "Hourly"]
     )
@@ -73,7 +69,6 @@ def main():
 
     # ======================================================
     # 1. LOAD DATA (Merge Train + Val)
-    # (Logic này đã chuẩn, giữ nguyên)
     # ======================================================
     print(f"📂 Loading data (Train+Val)...")
     train_df = pd.read_csv(os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv"))
@@ -91,7 +86,6 @@ def main():
 
     # ======================================================
     # 2. FIT PIPELINE & SCALER (ONCE)
-    # (Logic này đã chuẩn, giữ nguyên)
     # ======================================================
     feature_pipeline = create_feature_pipeline()
     scaler = RobustScaler()
@@ -149,20 +143,16 @@ def main():
         print(f"   Train RMSE: {train_metrics['RMSE']:.4f}")
 
         # 7. SAVE MODEL (separate name for each target)
-        # ✅ SỬA 3: Dùng đúng tên model LINEAR
         model_name = f"{target_name}_{config.MODEL_NAME_LINEAR}"
         model_path = os.path.join(config.MODEL_DIR, model_name)
         joblib.dump(model, model_path)
         print(f"💾 Model saved to: {model_path}")
 
     # Save all train metrics
-    # ✅ SỬA 4: Dùng đúng tên file metrics LINEAR
     metrics_path = os.path.join(config.OUTPUT_DIR, config.TRAIN_METRICS_LINEAR_NAME)
     with open(metrics_path, "w") as f:
         yaml.dump(all_train_metrics, f, sort_keys=False)
     print(f"\n💾 All train metrics saved to: {metrics_path}")
-    
-    # ✅ SỬA 5: Sửa lại tên file inference
     print(f"\n🚀 NEXT STEP: Run 'python inference_linear.py'")
     task.close()
 

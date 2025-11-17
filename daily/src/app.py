@@ -33,7 +33,7 @@ if os.path.exists(DAY_BACKGROUND_PATH):
 bg_layer_0_size = "200% 200%"
 bg_layer_0_animation = "none"
 if is_daytime:
-    # --- CÀI ĐẶT BAN NGÀY (THEO ẢNH BÌNH MINH) ---
+    # --- DAYTIME SETUP (BASED ON SUNRISE IMAGE) ---
     sky_icon = "☀️"
     if DAY_BACKGROUND_DATA_URI:
         css_background_gradient = f"url('{DAY_BACKGROUND_DATA_URI}') center/cover no-repeat"
@@ -58,7 +58,7 @@ if is_daytime:
         animation: none;
         mix-blend-mode: normal;
     """
-    # Cài đặt thẻ (card)
+    # Card Setup
     card_background = "rgba(255, 255, 255, 0.7)"
     card_text_color = "#0b2545"
     muted_text = "#4f6272"
@@ -70,11 +70,11 @@ if is_daytime:
     forecast_temp_color = "#0b2545"
     summary_temp_color = "#0b2545"
 else:
-    # --- CÀI ĐẶT CHO BAN ĐÊM (CÓ SAO) ---
+    # --- NIGHTTIME SETUP (WITH STARS) ---
     sky_icon = "🌙"
-    # Lớp 1: Nền galaxy
+    # Layer 1: Galaxy Background
     css_background_gradient = "linear-gradient(135deg, #020111, #19193a, #0d1a2f, #19193a)"
-    # Lớp 2: Sao xa (nhỏ)
+    # Layer 2: Distant Stars (small)
     css_layer_1 = """
         background: radial-gradient(1px 1px at 20px 30px, #eee, transparent),
                     radial-gradient(1px 1px at 40px 60px, #fff, transparent),
@@ -86,7 +86,7 @@ else:
         opacity: 0.7;
         animation: none;
     """
-    # Lớp 3: Sao gần (lớn)
+    # Layer 3: Closer Stars (large)
     css_layer_2 = """
         background: radial-gradient(2px 2px at 50px 50px, #fff, transparent),
                     radial-gradient(2px 2px at 100px 100px, #eee, transparent),
@@ -96,7 +96,7 @@ else:
         opacity: 0.8;
         animation: none;
     """
-    # Cài đặt thẻ (card)
+    # Card Setup
     card_background = "rgba(7, 22, 37, 0.38)"
     card_text_color = "#e0f7fa"
     muted_text = "#9fbcd4"
@@ -109,49 +109,49 @@ else:
     hero_metric_value_color = "#e9f5ff"
     bg_layer_0_size = "200% 200%"
     bg_layer_0_animation = "gradientAnimation 45s ease infinite"
-# --- TIÊM CSS VÀ HTML CHO CÁC LỚP BACKGROUND ---
+# --- INJECT CSS AND HTML FOR BACKGROUND LAYERS ---
 st.markdown(f"""
 <style>
-    /* --- ĐỊNH NGHĨA ANIMATION --- */
+    /* --- ANIMATION DEFINITION --- */
     @keyframes gradientAnimation {{
         0% {{ background-position: 0% 50%; }}
         50% {{ background-position: 100% 50%; }}
         100% {{ background-position: 0% 50%; }}
     }}
-    /* --- ÁP DỤNG CSS --- */
-    /* Lớp CSS chung cho các layer background */
+    /* --- APPLY CSS --- */
+    /* General CSS class for background layers */
     .background-layer {{
-        position: fixed; /* Fix cứng với viewport */
+        position: fixed; /* Fixed to viewport */
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        overflow: hidden; /* Tránh tràn */
+        overflow: hidden; /* Prevent overflow */
     }}
-    /* Lớp 1: Nền Gradient */
+    /* Layer 1: Gradient Background */
     #bg-layer-0 {{
         background: {css_background_gradient};
         background-size: {bg_layer_0_size};
         animation: {bg_layer_0_animation};
-        z-index: -3; /* Lớp dưới cùng */
+        z-index: -3; /* Bottom layer */
     }}
-    /* Lớp 2: Mây Xa / Sao Xa */
+    /* Layer 2: Distant Clouds / Distant Stars */
     #bg-layer-1 {{
         {css_layer_1}
         z-index: -2;
     }}
-    /* Lớp 3: Mây Gần / Sao Gần */
+    /* Layer 3: Close Clouds / Close Stars */
     #bg-layer-2 {{
         {css_layer_2}
         z-index: -1;
     }}
-    /* --- CSS CHO CÁC THÀNH PHẦN CÒN LẠI --- */
-    /* Đảm bảo .stApp TRONG SUỐT để thấy các layer bên dưới */
+    /* --- CSS FOR REMAINING COMPONENTS --- */
+    /* Ensure .stApp is TRANSPARENT to show layers beneath */
     .stApp {{
         background: transparent !important; 
         color: {card_text_color};
     }}
-    /* <<< SỬA ĐỔI: LÀM TRONG SUỐT SIDEBAR >>> */
+    /* <<< MODIFICATION: MAKE SIDEBAR TRANSPARENT >>> */
     [data-testid="stSidebar"] > div:first-child {{
         background: linear-gradient(180deg, rgba(8,15,32,0.95), rgba(23,38,68,0.92));
         backdrop-filter: blur(12px);
@@ -160,11 +160,11 @@ st.markdown(f"""
         box-shadow: 0 24px 55px rgba(0, 0, 0, 0.35);
         border-radius: 0 24px 24px 0;
     }}
-    /* Đổi màu chữ mặc định cho các thành phần trong sidebar */
+    /* Change default text color for components in sidebar */
     .stSidebar [data-testid="stMarkdownContainer"] p {{
         color: #f5f9ff !important;
     }}
-    /* <<< KẾT THÚC SỬA ĐỔI SIDEBAR >>> */
+    /* <<< END SIDEBAR MODIFICATION >>> */
     .main-header {{
         font-size: 3rem;
         font-weight: bold;
@@ -222,7 +222,7 @@ st.markdown(f"""
                 font-weight: 600;
                 color: #f5f9ff !important;
             }}
-            /* <<< SỬA ĐỔI: LÀM TRONG SUỐT SIDEBAR >>> */
+            /* <<< MODIFICATION: MAKE SIDEBAR TRANSPARENT >>> */
         color: {card_text_color};
     }}
     .weather-hero {{
@@ -240,7 +240,7 @@ st.markdown(f"""
         position: absolute;
         inset: 0;
         background: {hero_overlay};
-        z-index: -1; /* Nằm dưới nội dung hero */
+        z-index: -1; /* Below hero content */
     }}
     .weather-hero-content {{
         position: relative;
@@ -321,7 +321,6 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 # ======================================================
 # LOAD FUNCTIONS
-# (Phần này giữ nguyên)
 # ======================================================
 @st.cache_resource
 def load_all_models():
@@ -394,7 +393,6 @@ def get_weather_icon(temp: float) -> str:
     return "🌧️"
 # ======================================================
 # SIDEBAR
-# (Giữ nguyên)
 # ======================================================
 with st.sidebar:
     #st.image("https://img.icons8.com/clouds/200/000000/weather.png", width=150)
@@ -438,7 +436,6 @@ subtitle_color = "#4f6272" if is_daytime else "#d0e6ff"
 #     unsafe_allow_html=True)
 # ======================================================
 # CHECK IF DATA IS AVAILABLE
-# (Giữ nguyên)
 # ======================================================
 if models is None or df_test is None:
     st.error("⚠️ **Models or data not found!**")
@@ -452,7 +449,6 @@ if models is None or df_test is None:
     st.stop()
 # ======================================================
 # TABS
-# (Giữ nguyên)
 # ======================================================
 tab1, tab2, tab3, tab4 = st.tabs([
     "🔮 Multi-Target Forecast", 
@@ -461,8 +457,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "⚙️ Model Details"
 ])
 # ======================================================
-# TAB 1: MODEL PERFORMANCE
-# (Giữ nguyên)
+# TAB 1: MULTI-TARGET FORECAST
 # ======================================================
 with tab1:
     st.header("🔮 Multi-Target Temperature Forecast")
@@ -600,8 +595,7 @@ with tab1:
     else:
         st.warning("No test data available for forecasting.")
 # ======================================================
-# TAB 2: MULTI-TARGET FORECAST
-# (Giữ nguyên)
+# TAB 2: MODEL PERFORMANCE
 # ======================================================
 with tab2:
     st.header("📊 Model Performance Evaluation")
@@ -631,7 +625,7 @@ with tab2:
         with col2:
             st.markdown("### 📊 R² Score")
             fig, ax = plt.subplots(figsize=(8, 5))
-            colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#667eea', '#764ba2', '#f093fb'] # Thêm màu cho đủ 7
+            colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#667eea', '#764ba2', '#f093fb'] # Added colors for up to 7
             bars = ax.barh(metrics_df['Target'], metrics_df['R2'], color=colors)
             ax.set_xlabel('R² Score', fontsize=12, fontweight='bold')
             ax.set_title('Model Performance (R² Score)', fontsize=14, fontweight='bold')
@@ -694,9 +688,10 @@ with tab2:
                     st.pyplot(fig)
     else:
         st.warning("⚠️ Test metrics not found. Please run `python daily/src/inference.py` first.")
+# ... (Continuing from the previous translated block)
+
 # ======================================================
 # TAB 3: VISUALIZATIONS
-# (Giữ nguyên)
 # ======================================================
 with tab3:
     st.header("📈 Prediction Visualizations")
@@ -707,7 +702,7 @@ with tab3:
         # Plot actual temperature (use target_t1 as actual since temp column may not exist)
         actual_col = config.TARGET_COL if config.TARGET_COL in df_pred.columns else 'target_t1' #
         ax.plot(df_pred['datetime'], df_pred[actual_col], 
-               label='Actual', color='black', linewidth=2, alpha=0.8)
+                label='Actual', color='black', linewidth=2, alpha=0.8)
         # Plot predictions for each target
         colors_pred = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#FF9AA2', '#FFB7B2', '#FFDAC1']
         markers = ['o', 's', '^', 'd', 'v', 'p', '*']
@@ -716,114 +711,108 @@ with tab3:
             if pred_col in df_pred.columns:
                 df_plot = df_pred.dropna(subset=[pred_col])
                 ax.plot(df_plot['datetime'], df_plot[pred_col], 
-                       label=f'Predicted {target_name.upper()}',
-                       color=colors_pred[idx], 
-                       marker=markers[idx],
-                       markersize=3,
-                       linewidth=1.5,
-                       alpha=0.7,
-                       linestyle='--')
+                        label=f'Predicted {target_name.upper()}',
+                        color=colors_pred[idx], 
+                        marker=markers[idx],
+                        markersize=3,
+                        linewidth=1.5,
+                        alpha=0.7,
+                        linestyle='--')
         ax.set_xlabel('Date', fontsize=12, fontweight='bold')
         ax.set_ylabel('Temperature (°C)', fontsize=12, fontweight='bold')
-        ax.set_title('Multi-Target Temperature Predictions on Test Set', fontsize=14, fontweight='bold')
-        ax.legend(loc='best', fontsize=10)
+        ax.set_title('Actual vs Multi-Step Predicted Temperature Over Time', fontsize=14, fontweight='bold')
+        ax.legend(fontsize=10)
         ax.grid(True, alpha=0.3)
         plt.xticks(rotation=45)
         plt.tight_layout()
         st.pyplot(fig)
-        # Residual plots
-        st.subheader("📉 Residual Analysis")
-        cols = st.columns(2)
-        for idx, target_name in enumerate(config.TARGET_FORECAST_COLS[:2]):  # Show first 2
-            pred_col = f'pred_{target_name}'
-            if pred_col in df_pred.columns:
-                with cols[idx]:
-                    df_clean = df_pred.dropna(subset=[pred_col, target_name])
-                    residuals = df_clean[target_name] - df_clean[pred_col]
-                    fig, ax = plt.subplots(figsize=(7, 5))
-                    ax.scatter(df_clean[pred_col], residuals, alpha=0.5, color=colors_pred[idx])
-                    ax.axhline(y=0, color='red', linestyle='--', linewidth=2)
-                    ax.set_xlabel('Predicted Temperature (°C)', fontsize=11, fontweight='bold')
-                    ax.set_ylabel('Residuals (°C)', fontsize=11, fontweight='bold')
-                    ax.set_title(f'Residual Plot: {target_name.upper()}', fontsize=12, fontweight='bold')
-                    ax.grid(True, alpha=0.3)
-                    st.pyplot(fig)
-        # Error distribution
-        st.subheader("📊 Error Distribution")
-        fig, axes = plt.subplots(2, 4, figsize=(16, 8))
-        axes = axes.flatten()
-        for idx, target_name in enumerate(config.TARGET_FORECAST_COLS): #
-            pred_col = f'pred_{target_name}'
-            if pred_col in df_pred.columns:
-                df_clean = df_pred.dropna(subset=[pred_col, target_name])
-                errors = df_clean[target_name] - df_clean[pred_col]
-                axes[idx].hist(errors, bins=30, color=colors_pred[idx], alpha=0.7, edgecolor='black')
-                axes[idx].axvline(x=0, color='red', linestyle='--', linewidth=2)
-                axes[idx].set_xlabel('Error (°C)', fontsize=11, fontweight='bold')
-                axes[idx].set_ylabel('Frequency', fontsize=11, fontweight='bold')
-                axes[idx].set_title(f'{target_name.upper()} - Mean Error: {errors.mean():.3f}°C', 
-                                  fontsize=12, fontweight='bold')
-                axes[idx].grid(axis='y', alpha=0.3)
-        plt.tight_layout()
-        st.pyplot(fig)
+
+        # Plotting Prediction Errors
+        st.subheader("📉 Prediction Residuals (Errors) Over Time")
+        # Select target for error plotting
+        selected_target = st.selectbox(
+            "Select Target to Visualize Error:", 
+            options=config.TARGET_FORECAST_COLS, 
+            index=0
+        )
+        if selected_target:
+            pred_col = f'pred_{selected_target}'
+            actual_col = selected_target # The actual target column from df_test
+            # Merge df_test (actual) and df_pred (prediction)
+            df_merged = pd.merge(df_test[['datetime', actual_col]], 
+                                df_pred[['datetime', pred_col]], 
+                                on='datetime', 
+                                how='inner')
+            
+            # Calculate residual (Error = Actual - Predicted)
+            if actual_col in df_merged.columns and pred_col in df_merged.columns:
+                df_merged['residual'] = df_merged[actual_col] - df_merged[pred_col]
+                
+                fig_res, ax_res = plt.subplots(figsize=(14, 5))
+                ax_res.plot(df_merged['datetime'], df_merged['residual'], 
+                            'o', markersize=4, color='#FF9A8B', alpha=0.6, label='Residual')
+                ax_res.axhline(0, color='black', linestyle='--', linewidth=1)
+                
+                # Highlight mean error
+                mean_error = df_merged['residual'].mean()
+                ax_res.axhline(mean_error, color='#4ECDC4', linestyle='-', linewidth=2, label=f'Mean Error: {mean_error:.3f}°C')
+                
+                ax_res.set_xlabel('Date', fontsize=12, fontweight='bold')
+                ax_res.set_ylabel('Residual (Actual - Predicted) (°C)', fontsize=12, fontweight='bold')
+                ax_res.set_title(f'Residual Plot for {selected_target.upper()}', fontsize=14, fontweight='bold')
+                ax_res.legend()
+                ax_res.grid(True, alpha=0.3)
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                st.pyplot(fig_res)
+            else:
+                st.warning(f"Columns '{actual_col}' or '{pred_col}' not found for residual calculation.")
     else:
-        st.warning("⚠️ Prediction results not found. Please run `python daily/src/inference.py` first.")
+        st.warning("⚠️ Prediction data not available for visualization.")
+
 # ======================================================
 # TAB 4: MODEL DETAILS
-# (Giữ nguyên)
 # ======================================================
 with tab4:
-    st.header("⚙️ Model Configuration & Hyperparameters")
-    # Project configuration
-    st.subheader("📋 Project Configuration")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**Data Split:**")
-        st.write(f"- Train Ratio: {config.TRAIN_RATIO}") #
-        st.write(f"- Val Ratio: {config.VAL_RATIO}") #
-        st.write(f"- Test Ratio: {1 - config.TRAIN_RATIO - config.VAL_RATIO}") #
-        st.markdown("**Feature Engineering:**")
-        st.write("- Time encodings: month/day sin-cos additions")
-        st.write("- Derived metrics: daylight_hours, solar_per_hour, temp_range, dewpoint_depression, sealevelpressure_change")
-        st.write("- Sensor inputs: humidity, pressure, dew, cloudcover, solarradiation, visibility, windspeed, windgust, precip")
-        st.write(f"- Forecast Horizons: {config.FORECAST_HORIZONS}") #
-    with col2:
-        st.markdown("**Training Configuration:**")
-        st.write(f"- Optuna Trials: {config.OPTUNA_TRIALS}") #
-        st.write(f"- CV Splits: {config.CV_N_SPLITS}") #
-        st.write(f"- Target Column: {config.TARGET_COL}") #
-        st.markdown("**Targets:**")
-        for target in config.TARGET_FORECAST_COLS: #
-            st.write(f"- {target.upper()}")
-    # Best hyperparameters
+    st.header("⚙️ Model Configuration and Details")
+    st.markdown('<div class="info-box">📄 Review the model configuration, best hyperparameters found by Optuna, and the list of features used for training.</div>', 
+                unsafe_allow_html=True)
+
+    st.subheader("💡 Best Hyperparameters (Optuna Search)")
     if best_params:
-        st.subheader("🏆 Best Hyperparameters (From Optuna)")
-        if 'best_params' in best_params:
-            for target_name, params in best_params['best_params'].items(): #
-                with st.expander(f"📊 {target_name.upper()} - Hyperparameters"):
-                    params_df = pd.DataFrame([params]).T
-                    params_df.columns = ['Value']
-                    params_df.index.name = 'Parameter'
-                    st.dataframe(params_df, use_container_width=True)
-    # Feature importance (if available)
-    st.subheader("📊 Feature Information")
-    st.markdown("""
-     **Pipeline (`daily/src/feature_engineering.py`):**
-     1. `TimeFeatureTransformer` adds cyclical encodings (month/day sin-cos).
-     2. `DerivedFeatureTransformer` builds daylight_hours, solar_per_hour, temp_range,
-         dewpoint_depression, and sealevelpressure_change using only same-row info.
-     3. `ColumnPreprocessor` selects weather sensors (humidity, sealevelpressure, dew,
-         cloudcover, solarradiation, visibility, windspeed, windgust, precip) and removes `temp`
-         before forward/backward filling gaps.
-    """)
+        # Reformat dictionary for display
+        params_list = []
+        for target, params in best_params.items():
+            for param_key, param_value in params.items():
+                params_list.append({
+                    'Target': target.upper(),
+                    'Parameter': param_key.replace('_', ' ').title(),
+                    'Value': param_value
+                })
+        params_df = pd.DataFrame(params_list)
+        st.dataframe(params_df, use_container_width=True)
+    else:
+        st.warning("⚠️ Best hyperparameters not found. Please run Optuna tuning first.")
+    
+    st.subheader("✨ Final Model Details")
+    model_info = {
+        "Model Type": ["Linear Model Family"],
+        "Optimization Goal": ["Minimize MAE (Mean Absolute Error) during Optuna search"],
+        "Multi-step Strategy": ["Multiple Output Models (MOM) - one model per forecast horizon (T+1 to T+7)"],
+        "Input Data Resolution": ["Daily"],
+        "Total Models Trained": [len(config.TARGET_FORECAST_COLS)]
+    }
+    model_info_df = pd.DataFrame(model_info).T.reset_index()
+    model_info_df.columns = ["Detail", "Value"]
+    st.dataframe(model_info_df, use_container_width=True)
+
+    st.subheader("📈 Feature Set Used")
+    if hasattr(config, 'FEATURES'):
+        st.info("The model was trained using the following features (see `config.py`):")
+        st.markdown("\n".join([f"- `{feat}`" for feat in config.FEATURES]))
+    else:
+        st.warning("⚠️ Feature list not defined in `config.py`.")
+        
 # ======================================================
-# FOOTER
-# (Giữ nguyên)
+# END OF FILE
 # ======================================================
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #666; padding: 2rem;'>
-    <p><b>Ho Chi Minh Weather Forecast Dashboard</b></p>
-    <p>Group 6 - Machine Learning Final Project</p>
-</div>
-""", unsafe_allow_html=True)

@@ -1,4 +1,3 @@
-# optuna_search_linear.py (V4 - LEAKAGE-FREE WITH GAP)
 import os
 import pandas as pd
 import numpy as np
@@ -19,20 +18,23 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # =============================================================================
 class PurgedTimeSeriesSplit:
     """
-    Time Series Cross-Validation với gap để tránh data leakage
+    Implements a Time Series Cross-Validation strategy with a gap 
+    (purge) between the training and validation sets to prevent data leakage.
     
     Parameters:
     -----------
     n_splits : int
-        Số lượng folds
+        The number of splits (folds).
     gap : int
-        Số rows bỏ qua giữa train và validation (purge window)
-        Ví dụ: gap=7 nghĩa là bỏ 7 ngày sau train, trước khi validation bắt đầu
+        The number of rows/steps to skip between the end of the training 
+        set and the start of the validation set (purge window).
+        Example: gap=7 means skipping 7 days/hours after training before 
+        validation starts.
     
     Example:
     --------
-    |-------- Train --------|  GAP (7 days)  |---- Val ----|
-       Fit pipeline here         (⛔)          Evaluate here
+    |-------- Train --------|   GAP (7 days)   |---- Val ----|
+      Fit pipeline here         (⛔)            Evaluate here
     """
     def __init__(self, n_splits=5, gap=0):
         self.n_splits = n_splits
@@ -42,18 +44,18 @@ class PurgedTimeSeriesSplit:
         n_samples = len(X)
         indices = np.arange(n_samples)
         
-        # Tính kích thước mỗi fold
+        # Calculate the size of each fold
         test_size = n_samples // (self.n_splits + 1)
         
         for i in range(self.n_splits):
-            # Train: từ đầu đến split point
+            # Train: from start up to the split point
             train_end = (i + 1) * test_size
             
-            # Gap: loại bỏ `gap` rows sau train
+            # Gap: discard `gap` rows after train
             val_start = train_end + self.gap
             val_end = val_start + test_size
             
-            # Đảm bảo không vượt quá dataset
+            # Ensure indices do not exceed the dataset boundary
             if val_end > n_samples:
                 break
             
@@ -67,11 +69,12 @@ class PurgedTimeSeriesSplit:
 
 
 # =============================================================================
-# ALIGNMENT FUNCTION (SỬA LỖI DROPNA)
+# ALIGNMENT FUNCTION (FIXED DROPNA LOGIC)
 # =============================================================================
 def align_data_for_tuning(X_raw, y_raw, pipeline, scaler, fit_transform=False):
     """
-    Standard align function: Run pipeline, scale, and join with y to dropna
+    Standard align function: Runs feature engineering pipeline, scales data, 
+    and joins with the target (y) to handle NaNs resulting from feature creation.
     """
     # 1. Run pipeline
     if fit_transform:
@@ -91,9 +94,9 @@ def align_data_for_tuning(X_raw, y_raw, pipeline, scaler, fit_transform=False):
     
     combined = pd.concat([y_df, X_df], axis=1)
     
-    # ✅✅✅ SỬA LỖI Ở ĐÂY ✅✅✅
-    # Chỉ drop các hàng mà CỘT TARGET (y) bị NaN
-    # (Chúng ta giả định X_df đã sạch NaNs nhờ pipeline)
+    # ✅✅✅ FIX APPLIED HERE ✅✅✅
+    # Only drop rows where the TARGET COLUMN (y) is NaN
+    # (We assume X_df is clean of NaNs due to proper pipeline handling)
     combined_clean = combined.dropna(subset=[y_aligned.name]) 
     
     y_final = combined_clean[y_aligned.name]
@@ -102,15 +105,16 @@ def align_data_for_tuning(X_raw, y_raw, pipeline, scaler, fit_transform=False):
     return X_final, y_final
 
 # =============================================================================
-# DATA LOADING (FIXED - THÊM BƯỚC DROPNA QUAN TRỌNG)
+# DATA LOADING (INCLUDES CRITICAL DROPNA STEP)
 # =============================================================================
 def load_data_for_tuning(target_name):
     """
-    ✅ FIXED: Gộp, xử lý datetime VÀ dropna TRƯỚC KHI CV.
+    Loads combined train and validation data, processes 'datetime', sorts,
+    and removes rows with NaN in the target column BEFORE CV.
     """
     print(f"🔍 Loading RAW data (Train + Val COMBINED) for {target_name}...")
     
-    # 1. Load CSVs (Không parse, không set index)
+    # 1. Load CSVs
     train_df = pd.read_csv(
         os.path.join(config.PROCESSED_DATA_DIR, "data_train.csv")
     )
@@ -118,28 +122,27 @@ def load_data_for_tuning(target_name):
         os.path.join(config.PROCESSED_DATA_DIR, "data_val.csv")
     )
     
-    # 2. Gộp lại
+    # 2. Concatenate
     all_train_data = pd.concat([train_df, val_df], ignore_index=True)
     
-    # 3. Xử lý Datetime (Logic cũ của bạn, rất tốt)
+    # 3. Process Datetime
     if 'datetime' not in all_train_data.columns:
-         raise KeyError("❌ Không tìm thấy cột 'datetime' trong file CSV.")
+          raise KeyError("❌ 'datetime' column not found in the CSV file.")
     
-    print(f"   ...Sử dụng cột 'datetime' làm cột thời gian")
+    print(f"   ...Using 'datetime' column as the time index")
     all_train_data['datetime'] = pd.to_datetime(all_train_data['datetime'])
     all_train_data = all_train_data.set_index('datetime', drop=False)
 
-    # 4. Sắp xếp lại (Quan trọng cho CV)
+    # 4. Sort (Crucial for CV)
     all_train_data = all_train_data.sort_index()
 
-    # 5. ✅✅✅ SỬA LỖI QUAN TRỌNG NHẤT ✅✅✅
-    # Xóa bất kỳ hàng nào có giá trị NaN trong cột target
-    # (do lỗi từ file Excel gốc)
+    # 5. ✅✅✅ CRITICAL FIX ✅✅✅
+    # Remove any rows with NaN values in the target column
     rows_before = len(all_train_data)
     all_train_data = all_train_data.dropna(subset=[target_name])
     rows_after = len(all_train_data)
     if rows_before > rows_after:
-        print(f"   ⚠️ Đã xóa {rows_before - rows_after} hàng có NaN trong cột target.")
+        print(f"   ⚠️ Removed {rows_before - rows_after} rows with NaN in the target column.")
 
     # 6. Extract X and y
     y_train_full_raw = all_train_data[target_name]
@@ -155,16 +158,13 @@ def load_data_for_tuning(target_name):
 # =============================================================================
 def linear_objective(trial, X_all_train_raw, y_all_train_raw):
     """
-    ✅ FIXED: Objective function với Purged TimeSeriesSplit
-    
-    Đảm bảo:
-    - Mỗi fold có pipeline và scaler riêng
-    - Gap giữa train và val để tránh leakage
-    - Temporal order được bảo toàn
+    Optuna objective function for linear models using Purged TimeSeriesSplit.
+    Ensures: unique pipelines/scalers per fold, purge gap, and preserved temporal order.
+    Minimizes the average Root Mean Squared Error (RMSE).
     """
     ranges = config.LINEAR_PARAM_RANGES
     
-    # 1. Suggest model và hyperparameters
+    # 1. Suggest model type and hyperparameters
     model_type = trial.suggest_categorical("model_type", ranges['model_type'])
     
     if model_type == 'LinearRegression':
@@ -179,7 +179,7 @@ def linear_objective(trial, X_all_train_raw, y_all_train_raw):
             model_params['l1_ratio'] = trial.suggest_float("l1_ratio", *ranges['l1_ratio'])
             model_params['max_iter'] = 2000
 
-    # ✅ 2. Purged Time Series CV với gap
+    # ✅ 2. Purged Time Series CV with gap
     tscv = PurgedTimeSeriesSplit(
         n_splits=config.CV_N_SPLITS, 
         gap=config.CV_GAP_ROWS
@@ -199,18 +199,20 @@ def linear_objective(trial, X_all_train_raw, y_all_train_raw):
         train_dates = X_train_fold_raw.index
         val_dates = X_val_fold_raw.index
         
+        # Ensure training period ends before validation period starts
         assert train_dates.max() < val_dates.min(), \
             f"❌ FOLD {fold_num+1} LEAKAGE DETECTED! Train ends {train_dates.max()}, Val starts {val_dates.min()}"
         
         # Log first fold for verification
         if fold_num == 0:
-            gap_days = (val_dates.min() - train_dates.max()).days
-            print(f"  ✅ Fold 1 verified:")
-            print(f"     Train: {train_dates.min().date()} → {train_dates.max().date()}")
-            print(f"     Gap:   {gap_days} days")
-            print(f"     Val:   {val_dates.min().date()} → {val_dates.max().date()}")
+            # Calculate gap in days based on datetime index
+            gap_duration = (val_dates.min() - train_dates.max())
+            print(f"  ✅ Fold 1 verified:")
+            print(f"     Train: {train_dates.min()} → {train_dates.max()}")
+            print(f"     Gap:   {gap_duration} (approx {config.CV_GAP_DAYS} days)")
+            print(f"     Val:   {val_dates.min()} → {val_dates.max()}")
 
-        # ✅ 4. Create NEW pipeline and scaler for this fold
+        # ✅ 4. Create NEW pipeline and scaler for this fold (no data leakage)
         feature_pipeline_fold = create_feature_pipeline()
         scaler_fold = RobustScaler()
 
@@ -228,7 +230,7 @@ def linear_objective(trial, X_all_train_raw, y_all_train_raw):
             fit_transform=False  # ← Only transform on val
         )
 
-        # 7. Train model
+        # 7. Initialize and Train model
         if model_type == 'LinearRegression':
             model = LinearRegression(**model_params)
         elif model_type == 'Ridge':
@@ -252,38 +254,39 @@ def linear_objective(trial, X_all_train_raw, y_all_train_raw):
     return final_rmse
 
 # =============================================================================
-# MAIN OPTUNA SEARCH FUNCTION (ĐÃ SỬA LỖI CONFIG)
+# MAIN OPTUNA SEARCH FUNCTION (CONFIG FIXES APPLIED)
 # =============================================================================
 def run_optuna_search_linear():
     """
-    Run Optuna hyperparameter search for all forecast horizons
+    Main function to orchestrate the Optuna search for linear models 
+    across all specified target columns.
     """
     # Initialize ClearML task
     task = Task.init(
         project_name=config.CLEARML_PROJECT_NAME,
-        # ✅ SỬA 1: Tự đặt tên Task, không dùng biến config đã xóa
+        # FIX 1: Manually set task name
         task_name="Optuna Linear (Hourly)", 
-        tags=["Optuna", "LinearRegression", "Multi-Horizon", "Purged-CV", "Hourly"] # ✅ Sửa tag
+        tags=["Optuna", "LinearRegression", "Multi-Horizon", "Purged-CV", "Hourly"]
     )
     
     all_best_params = {}
     all_best_scores = {}
     all_best_details = {}
 
-    # Loop through all forecast horizons
+    # Loop through all forecast horizons (target columns)
     for target_name in config.TARGET_FORECAST_COLS:
         print("\n" + "="*80)
         print(f"🎯 TUNING FOR: {target_name}")
         print("="*80)
-    
+        
         # Load raw data
         X_all_train_raw, y_all_train_raw = load_data_for_tuning(target_name)
         
         print(f"🔍 Starting Optuna search...")
-        # ✅ SỬA 2: In ra GAP_ROWS cho chính xác
-        print(f"   Strategy: {config.CV_N_SPLITS}-Fold Purged TimeSeriesSplit (Gap={config.CV_GAP_ROWS} rows/hours)")
-        print(f"   Trials:   {config.OPTUNA_TRIALS}")
-        print(f"   ⚠️  This will take time (re-fits pipelines in each fold)...\n")
+        # FIX 2: Print GAP_ROWS correctly
+        print(f"   Strategy: {config.CV_N_SPLITS}-Fold Purged TimeSeriesSplit (Gap={config.CV_GAP_ROWS} rows/hours)")
+        print(f"   Trials:   {config.OPTUNA_TRIALS}")
+        print(f"   ⚠️  This will take time (re-fits pipelines in each fold)...\n")
         
         # Create and run Optuna study
         study = optuna.create_study(direction="minimize")
@@ -303,18 +306,18 @@ def run_optuna_search_linear():
         all_best_details[target_name] = {
             "val_rmse": float(val_rmse),
             "n_folds": config.CV_N_SPLITS,
-            # ✅ SỬA 3: Lưu lại GAP_ROWS cho chính xác
+            # FIX 3: Save GAP_ROWS correctly
             "gap_rows": config.CV_GAP_ROWS 
         }
 
         # Print results
         print(f"\n🏆 BEST RESULTS FOR {target_name}:")
-        print(f"   Model Type:    {best_params.get('model_type')}")
-        print(f"   Avg Val RMSE:  {val_rmse:.4f} (across {config.CV_N_SPLITS} folds)")
+        print(f"   Model Type:    {best_params.get('model_type')}")
+        print(f"   Avg Val RMSE:  {val_rmse:.4f} (across {config.CV_N_SPLITS} folds)")
         if 'alpha' in best_params:
-            print(f"   Best Alpha:    {best_params.get('alpha'):.6f}")
+            print(f"   Best Alpha:    {best_params.get('alpha'):.6f}")
         if 'l1_ratio' in best_params:
-            print(f"   Best L1 Ratio: {best_params.get('l1_ratio'):.4f}")
+            print(f"   Best L1 Ratio: {best_params.get('l1_ratio'):.4f}")
     
     # Save results to YAML
     output = {
@@ -325,14 +328,14 @@ def run_optuna_search_linear():
             "n_trials": config.OPTUNA_TRIALS,
             "cv_strategy": "PurgedTimeSeriesSplit",
             "n_splits": config.CV_N_SPLITS,
-            # ✅ SỬA 4: Lưu lại GAP_ROWS cho chính xác
+            # FIX 4: Save GAP_ROWS correctly
             "gap_rows": config.CV_GAP_ROWS, 
             "search_space": config.LINEAR_PARAM_RANGES,
             "leakage_safe": True
         }
     }
     
-    # ✅ SỬA 5: Dùng đúng tên file output YAML
+    # FIX 5: Use the correct output YAML file name
     output_path = os.path.join(config.MODEL_DIR, config.OPTUNA_RESULTS_LINEAR_YAML)
     with open(output_path, "w") as f:
         yaml.dump(output, f, sort_keys=False, default_flow_style=False)
@@ -344,9 +347,9 @@ def run_optuna_search_linear():
     print(f"📁 Best params saved to: {output_path}")
     print(f"\n📊 Summary of Best RMSE:")
     for target, score in all_best_scores.items():
-        print(f"   {target}: {score:.4f}")
+        print(f"   {target}: {score:.4f}")
         
-    # ✅ SỬA 6: Cập nhật tên file next-step
+    # FIX 6: Update next-step file name
     print(f"\n🚀 NEXT STEP: Run 'python train_linear.py' to train final models")
     print("="*80)
     

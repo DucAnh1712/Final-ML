@@ -6,8 +6,7 @@ from sklearn.pipeline import Pipeline
 
 class TimeFeatureTransformer(BaseEstimator, TransformerMixin):
     """
-    Tạo cyclical time features (sin/cos encoding)
-    ✅ SAFE: Không sử dụng thông tin từ future
+    Creates cyclical time features (sin/cos encoding).
     """
     def __init__(self):
         pass
@@ -40,8 +39,7 @@ class TimeFeatureTransformer(BaseEstimator, TransformerMixin):
 
 class DerivedFeatureTransformer(BaseEstimator, TransformerMixin):
     """
-    Tạo derived features từ raw features
-    ✅ SAFE: Chỉ sử dụng thông tin trong cùng row
+    Creates derived features from raw features.
     """
     def __init__(self):
         pass
@@ -84,14 +82,14 @@ class DerivedFeatureTransformer(BaseEstimator, TransformerMixin):
 
 class ColumnPreprocessor(BaseEstimator, TransformerMixin):
     """
-    Select and preprocess final columns
+    Selects and preprocesses final columns.
     """
     def __init__(self):
         # Core weather features
         self.feature_cols = [
             'humidity', 'sealevelpressure', 'dew', 'cloudcover', 
             'solarradiation', 'visibility', 'windspeed', 'windgust', 'precip',
-            'temp'  # Will be removed in fit() to avoid leakage
+            'temp' # Will be removed in fit() to avoid leakage
         ]
         # Derived features
         self.derived_cols = [
@@ -109,7 +107,7 @@ class ColumnPreprocessor(BaseEstimator, TransformerMixin):
         
         self.final_cols = existing_features + existing_derived
         
-        # ✅ Remove 'temp' to avoid target leakage
+        # Remove 'temp' to avoid target leakage
         if 'temp' in self.final_cols:
             self.final_cols.remove('temp')
         
@@ -121,6 +119,7 @@ class ColumnPreprocessor(BaseEstimator, TransformerMixin):
         # ✅ SAFE IMPUTATION STRATEGY:
         # 1. Gap in CV prevents leakage
         # 2. Sensor readings are often stable over short periods
+        # We fill forward, then backward, then replace any remaining NaNs (likely from the very beginning of the dataset) with 0.
         df = df.ffill().bfill().fillna(0)
         
         return df
@@ -128,12 +127,12 @@ class ColumnPreprocessor(BaseEstimator, TransformerMixin):
 
 def create_feature_pipeline():
     """
-    Tạo pipeline feature engineering hoàn chỉnh
+    Creates the complete feature engineering pipeline.
     
     Pipeline steps:
-    1. TimeFeatureTransformer - Tạo cyclical time features
-    2. DerivedFeatureTransformer - Tạo derived features
-    3. ColumnPreprocessor - Select columns và impute missing values
+    1. TimeFeatureTransformer - Creates cyclical time features
+    2. DerivedFeatureTransformer - Creates derived features
+    3. ColumnPreprocessor - Selects columns and imputes missing values
     
     Returns:
     --------
